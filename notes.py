@@ -1,3 +1,12 @@
+https://github.com/kushalbhabra/pyMidi/blob/master/src/test.py
+https://www.edureka.co/community/19373/how-can-i-read-piano-notes-on-python    
+https://github.com/xamox/pygame/blob/master/examples/midi.py    
+
+
+##############################################
+
+
+
 beep = tone.create('A3', 0.5)
 
 def on_mouse_down():
