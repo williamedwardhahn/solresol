@@ -117,14 +117,17 @@ function wrapSyllables(word) {
   });
 }
 
-// Function to create colored squares with and without letters
-function createSquares(word, includeText) {
+// Function to create colored squares with letters or numbers
+function createSquares(word, includeText, includeNumbers = false) {
   return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
+    const number = includeNumbers ? syllableToNumber[match] : match;
+    const textClass = includeText ? 'letter' : 'letter no-text';
     return `<span class='square note_${match}'>` +
-           `<span class='letter ${includeText ? '' : 'no-text'}'>${match}</span>` +
+           `<span class='${textClass}'>${number}</span>` +
            `</span>`;
   });
 }
+
 
 // Function to get the word from the URL parameters
 function getWordFromURL() {
@@ -137,13 +140,13 @@ function displayWordAndDefinition() {
   const word = getWordFromURL();
   if (word) {
     const searchWord = word.toLowerCase();
-    // Retrieve the definition using a case-insensitive search
     const definition = Object.keys(dictionary).find(key => key.toLowerCase() === searchWord);
 
     const wordElement = document.getElementById('word');
     const plainWordElement = document.getElementById('plainWord');
     const coloredSquaresWithTextElement = document.getElementById('coloredSquaresWithText');
     const coloredSquaresNoTextElement = document.getElementById('coloredSquaresNoText');
+    const coloredSquaresWithNumbersElement = document.getElementById('coloredSquaresWithNumbers');
     const numberElement = document.getElementById('number');
     const definitionElement = document.getElementById('definition');
     
@@ -153,10 +156,12 @@ function displayWordAndDefinition() {
     plainWordElement.textContent = word || 'No word provided';
     coloredSquaresWithTextElement.innerHTML = createSquares(word, true);
     coloredSquaresNoTextElement.innerHTML = createSquares(word, false);
+    coloredSquaresWithNumbersElement.innerHTML = createSquares(word, true, true);
     numberElement.textContent = numberRepresentation || 'No number representation';
     definitionElement.textContent = definition ? dictionary[definition] : 'Definition not found.';
   }
 }
+
 
 
 // Function to handle the form submission
@@ -190,10 +195,10 @@ if (document.readyState === 'loading') {
   <div id="word" class="word">...</div>
   <div id="plainWord" class="word">...</div>
   <div id="coloredSquaresWithText" class="word">...</div>
+  <div id="coloredSquaresWithNumbers" class="word">...</div>
   <div id="coloredSquaresNoText" class="word">...</div>
   <div id="number" class="number"></div>
   <div id="definition" class="definition"></div>
 </div>
 </body>
 </html>
-
