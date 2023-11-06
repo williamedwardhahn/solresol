@@ -1,6 +1,6 @@
 # Solresol
 
-https://williamedwardhahn.github.io/solresol/Hahn_Solresol_Dictionary_7.html
+[Research Dictionary](https://williamedwardhahn.github.io/solresol/Hahn_Solresol_Dictionary_11.html)
 
 
 
