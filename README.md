@@ -1,6 +1,6 @@
 # Solresol
 
-[Research Dictionary](https://williamedwardhahn.github.io/solresol/Hahn_Solresol_Dictionary_14.html?word=doremifasollasi)
+[Research Dictionary](https://williamedwardhahn.github.io/solresol/Hahn_Solresol_Dictionary_17.html?word=dore domilado solresol)
 
 
 
