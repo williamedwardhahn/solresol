@@ -117,7 +117,7 @@ function displayMultipleWordsAndDefinitions() {
     coloredSquaresNoTextElement.innerHTML = createSquaresForMultipleWords(word, false);
     coloredSquaresWithNumbersElement.innerHTML = createSquaresForMultipleWords(word, true, true);
     numberElement.textContent = parseMultipleWordsToNumbers(word) || 'No number representation';
-    definitionElement.textContent = definitions.join(' '); // Join all definitions into one string
+    definitionElement.innerHTML = definitions.join('<br><br>'); // Join all definitions with two line breaks
 
   }
 }
@@ -227,4 +227,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 </body>
 </html>
-
