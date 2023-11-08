@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Definition Lookup</title>
+<script src="https://williamedwardhahn.github.io/solresol/solresol_dictionary.js"></script>
+<link rel="stylesheet" href="solresol_styles.css">
+
+<script>
+
+// Mapping syllables to numbers
+const syllableToNumber = {
+  'do': '1', 're': '2', 'mi': '3', 'fa': '4', 'sol': '5', 'la': '6', 'si': '7'
+};
+
+// Syllable to frequency mapping (in Hertz)
+const syllableFrequency = {
+  'do': 261.6,
+  're': 293.7,
+  'mi': 329.6,
+  'fa': 349.2,
+  'sol': 392.0,
+  'la': 440.0,
+  'si': 493.9
+};
+
+// Create a single AudioContext shared by the whole app
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// Function to get the word from the URL parameters
+function getWordFromURL() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('word'); // 'word' is the expected URL parameter
+}
+
+// Updated functions for handling multiple words
+
+function parseMultipleWordsToNumbers(words) {
+  let wordsArray = words.split(' ');
+  return wordsArray.map(word => {
+    let syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    return syllables ? syllables.map(syl => syllableToNumber[syl]).join('') : '';
+  }).join(' ');
+}
+
+function wrapMultipleWords(words) {
+  return words.split(' ').map(word => {
+    return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
+      return `<span class='note_${match}'>${match}</span>`;
+    });
+  }).join(' ');
+}
+
+function createImagesForMultipleWords(words) {
+  return words.split(' ').map(word => {
+    const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    if (!syllables) return '';
+    
+    return syllables.map(syl => {
+      const number = syllableToNumber[syl];
+      return `<img src="images/${number}.png" alt="${syl}" style="height:100px; width:50px;">`;
+    }).join('');
+  }).join(' ');
+}
+
+function createSquaresForMultipleWords(words, includeText, includeNumbers = false) {
+  return words.split(' ').map(word => {
+    return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
+      const number = includeNumbers ? syllableToNumber[match] : match;
+      const textClass = includeText ? 'letter' : 'letter no-text';
+      return `<span class='square note_${match}'>` +
+             `<span class='${textClass}'>${number}</span>` +
+             `</span>`;
+    });
+  }).join(' ');
+}
+
+// Function to display multiple words, their numerical representation, and definitions
+function displayMultipleWordsAndDefinitions() {
+  const word = getWordFromURL();
+  if (word) {
+    const searchWords = word.toLowerCase().split(' ');
+    const definitions = searchWords.map(searchWord => {
+      const definitionKey = Object.keys(dictionary).find(key => key.toLowerCase() === searchWord);
+      return definitionKey ? dictionary[definitionKey] : 'Definition not found.';
+    });
+
+    // Update elements with multiple words
+    const wordElement = document.getElementById('word');
+    const plainWordElement = document.getElementById('plainWord');
+    const coloredSquaresWithTextElement = document.getElementById('coloredSquaresWithText');
+    const coloredSquaresNoTextElement = document.getElementById('coloredSquaresNoText');
+    const coloredSquaresWithNumbersElement = document.getElementById('coloredSquaresWithNumbers');
+    const numberElement = document.getElementById('number');
+    const definitionElement = document.getElementById('definition');
+    const syllableImagesElement = document.getElementById('syllableImages');
+    
+    // Utilize the updated functions for multiple words
+    wordElement.innerHTML = wrapMultipleWords(word) || 'No word provided';
+    plainWordElement.textContent = word || 'No word provided';
+    coloredSquaresWithTextElement.innerHTML = createSquaresForMultipleWords(word, true);
+    coloredSquaresNoTextElement.innerHTML = createSquaresForMultipleWords(word, false);
+    coloredSquaresWithNumbersElement.innerHTML = createSquaresForMultipleWords(word, true, true);
+    numberElement.textContent = parseMultipleWordsToNumbers(word) || 'No number representation';
+    definitionElement.textContent = definitions.join(' '); // Join all definitions into one string
+    syllableImagesElement.innerHTML = createImagesForMultipleWords(word);
+  }
+}
+
+// Function to handle the form submission
+function handleFormSubmit(event) {
+  event.preventDefault();
+  const wordInput = document.getElementById('wordInput').value.trim();
+  if (wordInput) {
+    const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?word=${encodeURIComponent(wordInput.toLowerCase())}`;
+    window.history.pushState({ path: newUrl }, '', newUrl);
+    displayMultipleWordsAndDefinitions(); // Call the updated function
+  }
+}
+
+// Function to play sound for a syllable
+function playSyllable(syllable, startTime) {
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(syllableFrequency[syllable] || 0, audioCtx.currentTime); // value in hertz
+  gainNode.gain.setValueAtTime(0, startTime);
+  gainNode.gain.linearRampToValueAtTime(1, startTime + 0.1);
+  gainNode.gain.linearRampToValueAtTime(0, startTime + 0.5);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + 0.6); // play for 0.6 seconds including fade out
+}
+
+// Function to play the entire word
+function playWord(word) {
+  const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+  if (!syllables) return;
+
+  let startTime = audioCtx.currentTime + 0.1; // short delay before starting
+  syllables.forEach((syllable) => {
+    playSyllable(syllable, startTime);
+    startTime += 0.6; // move to the next note time
+  });
+}
+
+// Function to play multiple words separated by spaces
+function playMultipleWords(words) {
+  const wordsArray = words.split(' ');
+  let delay = 0;
+
+  wordsArray.forEach((word) => {
+    setTimeout(() => playWord(word), delay);
+    const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    delay += (syllables ? syllables.length : 0) * 600; // add delay based on number of syllables
+  });
+}
+
+// Wrap the event listener setup in a DOMContentLoaded event to ensure the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Event listener for the Play Sound button
+  const playButton = document.getElementById('playSound');
+  if (playButton) {
+    playButton.addEventListener('click', () => {
+      const word = getWordFromURL();
+      if (word) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume(); // Attempt to resume the audio context if it is suspended
+        }
+        playMultipleWords(word.toLowerCase()); // Call the updated function
+      }
+    });
+  }
+
+  // Initial display function call
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', displayMultipleWordsAndDefinitions);
+  } else {
+    displayMultipleWordsAndDefinitions();
+  }
+});
+
+</script>
+</head>
+<body>
+<div class="container">
+  <h1>Lookup Solresol Word</h1>
+  <form onsubmit="handleFormSubmit(event)">
+    <div class="input-group">
+      <input type="text" id="wordInput" placeholder="Enter Solresol words" required>
+      <input type="submit" value="Look Up">
+    </div>
+  </form>
+  <div id="word" class="word">...</div>
+  <div id="plainWord" class="word">...</div>
+  <div id="coloredSquaresWithText" class="word">...</div>
+  <div id="coloredSquaresWithNumbers" class="word">...</div>
+  <div id="coloredSquaresNoText" class="word">...</div>
+  <div id="number" class="number"></div>
+  <div id="syllableImages" class="word"></div>
+  <div id="definition" class="definition"></div><br>
+  <button id="playSound">Play Sound</button>
+</div>
+</body>
+</html>
+
