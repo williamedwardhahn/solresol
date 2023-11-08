@@ -148,7 +148,7 @@ function playWord(word) {
   });
 }
 
-// Function to play multiple words separated by spaces
+// Function to play multiple words separated by spaces with a pause between them
 function playMultipleWords(words) {
   const wordsArray = words.split(' ');
   let delay = 0;
@@ -156,9 +156,12 @@ function playMultipleWords(words) {
   wordsArray.forEach((word) => {
     setTimeout(() => playWord(word), delay);
     const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
-    delay += (syllables ? syllables.length : 0) * 600; // add delay based on number of syllables
+    // Calculate the delay for the next word
+    // Assuming each syllable takes 0.6 seconds and adding an additional 0.5 seconds pause between words
+    delay += (syllables ? syllables.length * 600 : 0) + 500; // add delay based on number of syllables plus a pause
   });
 }
+
 
 // Wrap the event listener setup in a DOMContentLoaded event to ensure the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -207,4 +210,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 </body>
 </html>
-
