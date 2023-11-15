@@ -23,10 +23,7 @@ h1 {
   color: #333;
 }
 
-.word,
-.number,
-.definition,
-.input-group {
+.word, .number, .definition, .input-group {
   margin-top: 20px;
 }
 
@@ -53,21 +50,28 @@ input[type="submit"]:hover {
   background-color: #4cae4c;
 }
 
-/* Styles from your formatting */
-.note_do { background: #c40233; color:white; border:0; padding:2px 3px }
-.note_re { background: #e16b1a; color:white; border:0; padding:2px 3px }
-.note_mi { background: #eac100; color:white; border:0; padding:2px 3px }
-.note_fa { background: #00a368; color:white; border:0; padding:2px 3px }
-.note_sol { background: #00b2b0; color:white; border:0; padding:2px 3px }
-.note_la { background: #0088bf; color:white; border:0; padding:2px 3px }
-.note_si { background: #624579; color:white; border:0; padding:2px 3px }
-.note_num { background: #eee; padding:2px 3px }
-.note_rep { background: #aaa; color:#444; padding:2px 3px }
+/* Styles for musical notes */
+.note_do, .note_re, .note_mi, .note_fa, .note_sol, .note_la, .note_si, .note_num, .note_rep {
+  padding: 2px 3px;
+  color: white;
+  border: 0;
+}
 
-.tri { background: #000; color: white }
-.pal { background: #676767; color: white }
-.dou { background: #ababab }
-.seq { background: #efefef }
+.note_do { background: #c40233; }
+.note_re { background: #e16b1a; }
+.note_mi { background: #eac100; color: black; }
+.note_fa { background: #00a368; }
+.note_sol { background: #00b2b0; }
+.note_la { background: #0088bf; }
+.note_si { background: #624579; }
+.note_num { background: #eee; color: black; }
+.note_rep { background: #aaa; color: #444; }
+
+/* Other styles */
+.tri { background: #000; color: white; }
+.pal { background: #676767; color: white; }
+.dou { background: #ababab; }
+.seq { background: #efefef; }
 
 .square {
   display: inline-block;
@@ -84,57 +88,59 @@ input[type="submit"]:hover {
   line-height: 24px;
 }
 
-.square .letter.no-text {
+.letter.no-text {
   visibility: hidden;
 }
 
-
-
-
-}
 .translator-container {
-    background-color: #fff;
-    max-width: 600px;
-    margin: 20px auto;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
+  background-color: #fff;
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
+
 textarea {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 16px;
-    font-size: 16px;
-    box-sizing: border-box;
-    border: 2px solid #ddd;
-    border-radius: 4px;
-    resize: vertical;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  box-sizing: border-box;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
 }
+
 button {
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #5c6bc0;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #5c6bc0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
+
 button:hover {
-    background-color: #3f51b5;
+  background-color: #3f51b5;
 }
+
 #translation {
-    margin-top: 20px;
-    padding: 10px;
-    background-color: #e8eaf6;
-    border: 1px solid #c5cae9;
-    border-radius: 4px;
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #e8eaf6;
+  border: 1px solid #c5cae9;
+  border-radius: 4px;
 }
+
 strong {
-    color: #3f51b5;
+  color: #3f51b5;
 }
 
-
-#note { font-size: 40px; margin-top: 50px; text-align: center; }
-#input { font-size: 30px; margin-top: 50px; text-align: center; }
-#message { font-size: 30px; margin-top: 50px; text-align: center; }
+#note, #input, #message {
+  font-size: 30px;
+  margin-top: 50px;
+  text-align: center;
+}
