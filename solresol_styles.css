@@ -134,3 +134,7 @@ strong {
     color: #3f51b5;
 }
 
+
+#note { font-size: 40px; margin-top: 50px; text-align: center; }
+#input { font-size: 30px; margin-top: 50px; text-align: center; }
+#message { font-size: 30px; margin-top: 50px; text-align: center; }
