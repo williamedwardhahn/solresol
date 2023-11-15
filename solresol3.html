@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        #note { font-size: 40px; margin-top: 50px; text-align: center; }
+        #input { font-size: 30px; margin-top: 50px; text-align: center; }
+        #message { font-size: 30px; margin-top: 50px; text-align: center; }
+    </style>
+</head>
+<body>
+	<div style="text-align: center;"><img src = "http://solresol.xyz/Solresol.png"></div>
+    <div id="note"></div>
+    <div id="input"></div>
+    <div id="message"></div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; // Frequencies for C4, D4, E4, F4, G4, A4, B4
+        const solresol = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
+
+        let currentNote = Math.floor(Math.random() * 7);
+        document.getElementById('note').textContent = solresol[currentNote];
+
+        function playTone(frequency) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(1, now + 0.1); // Attack
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.3); // Decay
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.7); // Sustain
+            gainNode.gain.linearRampToValueAtTime(0, now + 1); // Release
+
+            oscillator.start();
+
+            // Stop the oscillator after 1 second
+            setTimeout(() => oscillator.stop(), 1000);
+        }
+
+        window.addEventListener('keydown', function(event) {
+            if (event.keyCode >= 49 && event.keyCode <= 55) {
+                let inputNote = event.keyCode - 49;
+                document.getElementById('input').textContent = solresol[inputNote];
+
+                playTone(notes[inputNote]);
+
+                if (inputNote === currentNote) {
+                    document.getElementById('message').textContent = 'Correct!';
+                    currentNote = Math.floor(Math.random() * 7);
+                    document.getElementById('note').textContent = solresol[currentNote];
+                } else {
+                    document.getElementById('message').textContent = 'Incorrect, try again';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
