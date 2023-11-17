@@ -144,3 +144,14 @@ strong {
   margin-top: 50px;
   text-align: center;
 }
+
+.content-container {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#note, #input, #message {
+    margin-top: 10px;
+}
