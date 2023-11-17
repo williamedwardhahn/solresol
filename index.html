@@ -351,6 +351,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const wordFromURL = urlParams.get('word');
+    
+    if (wordFromURL) {
+        document.getElementById('wordInput').value = wordFromURL;
+    }
+
 </script>
 
 
@@ -362,14 +370,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div class="content-container">
 
+<div class="container">
+
 	<img src="http://solresol.xyz/Solresol.png" alt="Solresol Image">
 	<div id="note"></div>
 	<div id="input"></div>
 	<div id="message"></div>
 
+	</div>
+	
+	
 
-
-	<div class="translator-container">
+	<div class="container">
 	<h2>English to Solresol Translator</h2>
 	<textarea id="inputText" rows="4" placeholder="Enter English words (separated by spaces)"></textarea>
 	<button onclick="translateText()">Translate</button>
@@ -378,10 +390,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 	<div class="container">
 	
-	<h1>Solresol Dictionary</h1>
+	<h1>Lookup Solresol Word</h1>
 	<form onsubmit="handleFormSubmit(event)">
 	<div class="input-group">
-	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="" required>
+	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="dore domilado solresol" required>
 	<input type="submit" value="Look Up">
 	</div>
 	</form>
@@ -438,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
             
             <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
-            <p><a href="${translationUrl}" target="_blank">Show in Solresol Dictionary</a></p>
+            <p><a href="${translationUrl}" target="_blank">View on Solresol.xyz</a></p>
             `;
 
         document.getElementById('translation').innerHTML = fullTranslation;
