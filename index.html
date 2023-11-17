@@ -23,6 +23,19 @@ body {
   margin: 20px; /* Added margin for spacing */
 }
 
+
+.container2 {
+  text-align: center;
+  background-color: #fff;
+  padding: 40px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  max-width: 1200px;
+  width: 100%;
+  margin: 20px; /* Added margin for spacing */
+}
+
+
 h1 {
   color: #333;
 }
@@ -351,6 +364,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+
+
 </script>
 
 
@@ -362,26 +377,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div class="content-container">
 
+<div class="container2">
+
 	<img src="http://solresol.xyz/Solresol.png" alt="Solresol Image">
 	<div id="note"></div>
 	<div id="input"></div>
 	<div id="message"></div>
 
+</div>
+
+<div class="container2">
 
 
-	<div class="translator-container">
 	<h2>English to Solresol Translator</h2>
 	<textarea id="inputText" rows="4" placeholder="Enter English words (separated by spaces)"></textarea>
 	<button onclick="translateText()">Translate</button>
 	<div id="translation"></div>
+
+	
 	</div>
 
 	<div class="container">
 	
-	<h1>Solresol Dictionary</h1>
+	<h1>Lookup Solresol Word</h1>
 	<form onsubmit="handleFormSubmit(event)">
 	<div class="input-group">
-	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="" required>
+	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="dore domilado solresol" required>
 	<input type="submit" value="Look Up">
 	</div>
 	</form>
@@ -438,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
             
             <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
-            <p><a href="${translationUrl}" target="_blank">Show in Solresol Dictionary</a></p>
+            <p><a href="${translationUrl}" target="_blank">Show in Dictionary</a></p>
             `;
 
         document.getElementById('translation').innerHTML = fullTranslation;
