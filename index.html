@@ -1,12 +1,162 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Word Definition Lookup</title>
-<script src="https://williamedwardhahn.github.io/solresol/solresol_dictionary.js"></script>
-<link rel="stylesheet" href="solresol_styles.css">
+<html>
+<style>
+body {
+  font-family: 'Arial', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f7f7f7;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh; /* Changed from height to min-height */
+}
 
+.container {
+  text-align: center;
+  background-color: #fff;
+  padding: 40px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  max-width: 1200px;
+  width: 100%;
+  margin: 20px; /* Added margin for spacing */
+}
+
+h1 {
+  color: #333;
+}
+
+.word, .number, .definition, .input-group {
+  margin-top: 20px;
+}
+
+input[type="text"] {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  width: calc(100% - 22px);
+}
+
+input[type="submit"] {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  background-color: #5cb85c;
+  color: white;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+input[type="submit"]:hover {
+  background-color: #4cae4c;
+}
+
+/* Styles for musical notes */
+.note_do, .note_re, .note_mi, .note_fa, .note_sol, .note_la, .note_si, .note_num, .note_rep {
+  padding: 2px 3px;
+  color: white;
+  border: 0;
+}
+
+.note_do { background: #c40233; }
+.note_re { background: #e16b1a; }
+.note_mi { background: #eac100; color: black; }
+.note_fa { background: #00a368; }
+.note_sol { background: #00b2b0; }
+.note_la { background: #0088bf; }
+.note_si { background: #624579; }
+.note_num { background: #eee; color: black; }
+.note_rep { background: #aaa; color: #444; }
+
+/* Other styles */
+.tri { background: #000; color: white; }
+.pal { background: #676767; color: white; }
+.dou { background: #ababab; }
+.seq { background: #efefef; }
+
+.square {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.letter {
+  display: block;
+  color: white;
+  text-align: center;
+  line-height: 24px;
+}
+
+.letter.no-text {
+  visibility: hidden;
+}
+
+.translator-container {
+  background-color: #fff;
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 16px;
+  font-size: 16px;
+  box-sizing: border-box;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #5c6bc0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #3f51b5;
+}
+
+#translation {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #e8eaf6;
+  border: 1px solid #c5cae9;
+  border-radius: 4px;
+}
+
+strong {
+  color: #3f51b5;
+}
+
+#note, #input, #message {
+  font-size: 30px;
+  margin-top: 10px; /* Adjusted margin */
+  text-align: center;
+}
+
+.content-container {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+</style>
 <script>
 
 // Mapping syllables to numbers
@@ -202,28 +352,156 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 </script>
+
+
+
+
+
 </head>
 <body>
-<div class="container">
-  <h1>Lookup Solresol Word</h1>
-  <form onsubmit="handleFormSubmit(event)">
-    <div class="input-group">
-      <input type="text" id="wordInput" placeholder="Enter Solresol words" value="dore domilado solresol" required>
-      <input type="submit" value="Look Up">
-    </div>
-  </form>
-  <div id="word" class="word">...</div>
-  <div id="plainWord" class="word">...</div>
-  <div id="coloredSquaresWithText" class="word">...</div>
-  <div id="coloredSquaresWithNumbers" class="word">...</div>
-  <div id="coloredSquaresNoText" class="word">...</div>
-  <div id="number" class="number"></div>
-  <div id="syllableImages" class="word"></div>
-  <div id="syllableImages2" class="word"></div> <!-- New div for second row of images -->
-  <div id="syllableImages3" class="word"></div>
-  <div id="syllableImages4" class="word"></div>
-  <div id="definition" class="definition"></div><br>
-  <button id="playSound">Play Sound</button>
+
+<div class="content-container">
+
+	<img src="http://solresol.xyz/Solresol.png" alt="Solresol Image">
+	<div id="note"></div>
+	<div id="input"></div>
+	<div id="message"></div>
+
+
+
+	<div class="translator-container">
+	<h2>English to Solresol Translator</h2>
+	<textarea id="inputText" rows="4" placeholder="Enter English words (separated by spaces)"></textarea>
+	<button onclick="translateText()">Translate</button>
+	<div id="translation"></div>
+	</div>
+
+	<div class="container">
+	
+	<h1>Lookup Solresol Word</h1>
+	<form onsubmit="handleFormSubmit(event)">
+	<div class="input-group">
+	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="dore domilado solresol" required>
+	<input type="submit" value="Look Up">
+	</div>
+	</form>
+	
+	<div id="word" class="word">...</div>
+	<div id="plainWord" class="word">...</div>
+	<div id="coloredSquaresWithText" class="word">...</div>
+	<div id="coloredSquaresWithNumbers" class="word">...</div>
+	<div id="coloredSquaresNoText" class="word">...</div>
+	<div id="number" class="number"></div>
+	<div id="syllableImages" class="word"></div>
+	<div id="syllableImages2" class="word"></div> <!-- New div for second row of images -->
+	<div id="syllableImages3" class="word"></div>
+	<div id="syllableImages4" class="word"></div>
+	<div id="definition" class="definition"></div><br>
+	<button id="playSound">Play Sound</button>
+	
+	</div>
+
 </div>
+
+
+
+
+
+
+
+<script src="https://williamedwardhahn.github.io/solresol/solresol_dictionary.js"></script>
+
+
+
+
+<script>
+    function findFirstMatch(englishWord) {
+        for (const [solresolWord, englishTranslations] of Object.entries(dictionary)) {
+            const translationsArray = englishTranslations.toLowerCase().split(', ');
+            if (translationsArray.some(translation => translation.split(/\s+/).includes(englishWord.toLowerCase()))) {
+                return { solresolWord, englishTranslations };
+            }
+        }
+        return { solresolWord: '', englishTranslations: `No translation found for "${englishWord}"` };
+    }
+
+    function translateText() {
+        const text = document.getElementById('inputText').value.trim();
+        const words = text.split(/\s+/);
+        
+        const firstMatches = words.map(word => findFirstMatch(word));
+        const sentenceTranslation = firstMatches.map(match => match.solresolWord).join(' ').toLowerCase();
+        const detailedTranslations = firstMatches.map(match => `<strong>${match.solresolWord}:</strong> ${match.englishTranslations}`).join('<br>');
+
+        const translationUrl = `http://solresol.xyz/?word=${encodeURIComponent(sentenceTranslation)}`;
+        const fullTranslation = `
+            <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
+            
+            <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
+            <p><a href="${translationUrl}" target="_blank">View on Solresol.xyz</a></p>
+            `;
+
+        document.getElementById('translation').innerHTML = fullTranslation;
+    }
+</script>
+
+
+
+
+
+<script>
+
+
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; // Frequencies for C4, D4, E4, F4, G4, A4, B4
+    const solresol = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
+
+    let currentNote = Math.floor(Math.random() * 7);
+    document.getElementById('note').textContent = solresol[currentNote];
+
+    function playTone(frequency) {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.value = frequency;
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(1, now + 0.1); // Attack
+        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.3); // Decay
+        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.7); // Sustain
+        gainNode.gain.linearRampToValueAtTime(0, now + 1); // Release
+
+        oscillator.start();
+
+        // Stop the oscillator after 1 second
+        setTimeout(() => oscillator.stop(), 1000);
+    }
+
+    window.addEventListener('keydown', function(event) {
+        if (event.keyCode >= 49 && event.keyCode <= 55) {
+            let inputNote = event.keyCode - 49;
+            document.getElementById('input').textContent = solresol[inputNote];
+
+            playTone(notes[inputNote]);
+
+            if (inputNote === currentNote) {
+                document.getElementById('message').textContent = 'Correct!';
+                currentNote = Math.floor(Math.random() * 7);
+                document.getElementById('note').textContent = solresol[currentNote];
+            } else {
+                document.getElementById('message').textContent = 'Incorrect, try again';
+            }
+        }
+    });
+</script>
+
+
+
+
+
 </body>
 </html>
