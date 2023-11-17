@@ -378,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 	<div class="container">
 	
-	<h1>Lookup Solresol Word</h1>
+	<h1>Solresol Dictionary</h1>
 	<form onsubmit="handleFormSubmit(event)">
 	<div class="input-group">
 	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="dore domilado solresol" required>
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
             
             <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
-            <p><a href="${translationUrl}" target="_blank">View on Solresol.xyz</a></p>
+            <p><a href="${translationUrl}" target="_blank">Show in Solresol Dictionary</a></p>
             `;
 
         document.getElementById('translation').innerHTML = fullTranslation;
