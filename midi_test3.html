@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Key Display</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 50px;
+        }
+        #midiKey {
+            font-size: 24px;
+            margin-top: 20px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>MIDI Key Display</h1>
+    <div id="midiKey">Press a key on your MIDI device</div>
+
+<script>
+    if (navigator.requestMIDIAccess) {
+        navigator.requestMIDIAccess()
+            .then(onMIDISuccess, onMIDIFailure);
+
+        function onMIDISuccess(midiAccess) {
+            for (var input of midiAccess.inputs.values()) {
+                input.onmidimessage = getMIDIMessage;
+            }
+        }
+
+        function onMIDIFailure() {
+            document.getElementById('midiKey').innerText = 'Could not access your MIDI devices.';
+        }
+
+        function getMIDIMessage(midiMessage) {
+            if (midiMessage.data[0] === 144 || midiMessage.data[0] === 128) {
+                var noteNumber = midiMessage.data[1];
+                var noteInfo = getNoteInfo(noteNumber);
+                if (midiMessage.data[0] === 144 && midiMessage.data[2] !== 0) {
+                    document.getElementById('midiKey').innerText = 'Note: ' + noteInfo.name;
+                    document.body.style.backgroundColor = noteInfo.color; // Change background color
+                }
+            }
+        }
+
+        function getNoteInfo(noteNumber) {
+            // Scale pattern and corresponding colors
+            var scalePattern = {
+                'Do': '#c40233',
+                'Re': '#e16b1a',
+                'Mi': '#eac100',
+                'Fa': '#00a368',
+                'Sol': '#00b2b0',
+                'La': '#0088bf',
+                'Si': '#624579'
+            };
+
+            var offset = (noteNumber - 36) % 12;
+            var octave = Math.floor((noteNumber - 36) / 12);
+            var noteIndex = [0, 2, 4, 5, 7, 9, 11].indexOf(offset);
+
+            if (noteIndex !== -1) {
+                var noteName = Object.keys(scalePattern)[noteIndex];
+                return {
+                    name: noteName,
+                    color: scalePattern[noteName]
+                };
+            } else {
+                return {
+                    name: 'Unknown Note',
+                    color: 'initial' // Default background color
+                };
+            }
+        }
+    } else {
+        document.getElementById('midiKey').innerText = 'Web MIDI API not supported in this browser.';
+    }
+</script>
+
+
+
+</body>
+</html>
+
