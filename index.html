@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <style>
@@ -421,6 +422,17 @@ document.addEventListener('DOMContentLoaded', function() {
 	<button id="playSound">Play Sound</button>
 	
 	</div>
+	
+	
+	
+	    <!-- MIDI Key Display Container -->
+	    <div class="container">
+		<h1>MIDI Key Display</h1>
+		<div id="midiKey">Press key on MIDI</div>
+	    </div>
+
+	
+	
 
 </div>
 
@@ -521,7 +533,44 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 
+<script>
 
+    // MIDI Key Display Script
+    if (navigator.requestMIDIAccess) {
+        navigator.requestMIDIAccess().then(midiAccess => {
+            for (var input of midiAccess.inputs.values()) {
+                input.onmidimessage = midiMessage => {
+                    if (midiMessage.data[0] === 144 || midiMessage.data[0] === 128) {
+                        var noteNumber = midiMessage.data[1];
+                        var noteInfo = getNoteInfo(noteNumber);
+                        if (midiMessage.data[0] === 144 && midiMessage.data[2] !== 0) {
+                            document.getElementById('midiKey').innerText = noteInfo.name;
+                            document.body.style.backgroundColor = noteInfo.color;
+                        }
+                    }
+                };
+            }
+        });
+
+        function getNoteInfo(noteNumber) {
+            var scalePattern = {
+                'Do': '#c40233', 'Re': '#e16b1a', 'Mi': '#eac100',
+                'Fa': '#00a368', 'Sol': '#00b2b0', 'La': '#0088bf', 'Si': '#624579'
+            };
+            var offset = (noteNumber - 36) % 12;
+            var noteIndex = [0, 2, 4, 5, 7, 9, 11].indexOf(offset);
+            if (noteIndex !== -1) {
+                var noteName = Object.keys(scalePattern)[noteIndex];
+                return { name: noteName, color: scalePattern[noteName] };
+            } else {
+                return { name: 'Unknown Note', color: 'initial' };
+            }
+        }
+    } else {
+        document.getElementById('midiKey').innerText = 'err';
+    }
+
+</script>
 
 
 </body>
