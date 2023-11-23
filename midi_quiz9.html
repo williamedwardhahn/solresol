@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Controller and Note Quiz Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 50px;
+        }
+        .noteButton, #startGame {
+            font-size: 20px;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        select, input[type=range], #score, #gameMessage, #midiKey {
+            margin-top: 20px;
+            font-size: 16px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MIDI Controller and Note Quiz Game</h1>
+    <select id="midiOutputDevices"></select>
+    <select id="midiVoices"><!-- Instrument options --></select>
+    <input type="range" id="volumeControl" min="0" max="127" value="100">
+    <div>
+        <button class="noteButton" data-note="60">C</button>
+        <button class="noteButton" data-note="62">D</button>
+        <button class="noteButton" data-note="64">E</button>
+        <!-- Add more note buttons -->
+    </div>
+    <button id="startGame">Start Note Quiz</button>
+    <div id="gameMessage">Press 'Start Note Quiz' to begin.</div>
+    <div id="score">Score: 0</div>
+
+    <script>
+        var midiOut, midiIn;
+        var currentNote, score = 0;
+
+        function onMIDISuccess(midiAccess) {
+            var outputs = Array.from(midiAccess.outputs.values());
+            midiOut = outputs[0];
+            midiIn = Array.from(midiAccess.inputs.values())[1];
+            midiIn.onmidimessage = getMIDIMessage;
+
+            outputs.forEach((output, index) => {
+                var option = document.createElement('option');
+                option.value = index;
+                option.textContent = output.name;
+                document.getElementById('midiOutputDevices').appendChild(option);
+            });
+
+            document.getElementById('midiOutputDevices').addEventListener('change', function() {
+                midiOut = outputs[this.value];
+            });
+
+            ['Piano', 'Violin', 'Flute'].forEach(voice => {
+                var option = document.createElement('option');
+                option.textContent = voice;
+                document.getElementById('midiVoices').appendChild(option);
+            });
+        }
+
+        function onMIDIFailure() {
+            console.log('Could not access MIDI devices.');
+        }
+
+        navigator.requestMIDIAccess({ sysex: true }).then(onMIDISuccess, onMIDIFailure);
+
+        document.querySelectorAll('.noteButton').forEach(button => {
+            button.addEventListener('click', function() {
+                var note = parseInt(this.getAttribute('data-note'));
+                playMIDINote(note);
+            });
+        });
+
+        document.getElementById('startGame').addEventListener('click', function() {
+            startGame();
+        });
+
+        function playMIDINote(note) {
+            if (!midiOut) return;
+            midiOut.send([0x90, note, 0x7f]); // Note on
+            setTimeout(() => midiOut.send([0x80, note, 0x40]), 500); // Note off
+        }
+
+        function getMIDIMessage(midiMessage) {
+            var command = midiMessage.data[0];
+            var noteNumber = midiMessage.data[1];
+            var velocity = midiMessage.data[2];
+
+            if (command === 192) { // Program change
+                var programNumber = noteNumber;
+                if (midiOut) midiOut.send([0xC0, programNumber]);
+            }
+
+            if (command === 144 && velocity > 0) { // Note on
+                if (noteNumber === currentNote) {
+                    score++;
+                    document.getElementById('score').innerText = 'Score: ' + score;
+                    document.getElementById('gameMessage').innerText = 'Correct! Playing next note...';
+                    setTimeout(() => {
+                        currentNote = generateRandomNote(); 
+                        playMIDINote(currentNote);
+                        document.getElementById('gameMessage').innerText = 'Play the note: ' + getNoteInfo(currentNote).name;
+                    }, 1000);
+                } else {
+                    document.getElementById('gameMessage').innerText = 'Incorrect, try again!';
+                    setTimeout(() => playMIDINote(currentNote), 1000); 
+                }
+            }
+        }
+
+        function startGame() {
+            score = 0;
+            document.getElementById('score').innerText = 'Score: ' + score;
+            currentNote = generateRandomNote();
+            playMIDINote(currentNote);
+            document.getElementById('gameMessage').innerText = 'Play the note: ' + getNoteInfo(currentNote).name;
+        }
+
+        function getNoteInfo(noteNumber) {
+            var scalePattern = {
+                'Do': '#c40233', 'Re': '#e16b1a', 'Mi': '#eac100', 'Fa': '#00a368',
+                'Sol': '#00b2b0', 'La': '#0088bf', 'Si': '#624579'
+            };
+
+            var offset = (noteNumber - 36) % 12;
+            var octave = Math.floor((noteNumber - 36) / 12);
+            var noteIndex = [0, 2, 4, 5, 7, 9, 11].indexOf(offset);
+
+            if (noteIndex !== -1) {
+                var noteName = Object.keys(scalePattern)[noteIndex];
+                return { name: noteName, color: scalePattern[noteName] };
+            } else {
+                return { name: 'Unknown Note', color: 'initial' };
+            }
+        }
+
+        function generateRandomNote() {
+            var whiteKeys = [60, 62, 64, 65, 67, 69, 71]; // C4, D4, E4, F4, G4, A4, B4
+            var randomIndex = Math.floor(Math.random() * whiteKeys.length);
+            return whiteKeys[randomIndex];
+        }
+    </script>
+</body>
+</html>
+
