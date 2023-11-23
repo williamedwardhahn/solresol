@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MIDI Note Frequency and Music Theory</title>
+    <link rel="stylesheet" href="https://latex.now.sh/style.css">
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <article class="indent-pars">
+        <h1>MIDI Note Frequency and Music Theory</h1>
+
+        <section>
+            <h2>Introduction</h2>
+            <p>Understanding the 12th root of 2 is essential in music theory, particularly in the context of Western music's equal temperament tuning system. This concept is foundational in dividing an octave into 12 equal parts, allowing for a consistent and harmonious sound across different keys.</p>
+        </section>
+
+        <section>
+            <h2>Mathematical Foundation</h2>
+            <p>The formula for calculating the frequency of a musical note is:</p>
+            <div class="theorem">
+                \( f = 440 \times 2^{(n - 69) / 12} \)
+            </div>
+            <p>Here, \( f \) represents the frequency, and \( n \) is the MIDI note number. The constant 440 Hz corresponds to the pitch of A4, a standard reference pitch. The 12th root of 2 (\( 2^{1/12} \)) is crucial for dividing an octave into 12 equal semitones, which is the basis of the equal temperament scale used in modern Western music.</p>
+        </section>
+
+        <section>
+            <h2>Physics of Sound</h2>
+            <p>Sound is a wave phenomenon characterized by its frequency. The frequency of a sound wave determines its pitch. Higher frequencies correspond to higher pitches. In music, different frequencies correspond to different musical notes.</p>
+        </section>
+
+        <section>
+            <h2>Historical Context</h2>
+            <p>The concept of equal temperament, where the octave is divided into 12 equal parts, has evolved over centuries. Before its widespread adoption, various tuning systems were used, leading to limitations in modulating between keys.</p>
+        </section>
+
+        <section>
+            <h2>Implications in Modern Music</h2>
+            <p>Equal temperament tuning allows for harmonic consistency across all keys, which is particularly beneficial in complex compositions and modern music production, including electronic and synthesized music.</p>
+        </section>
+
+        <section>
+            <h2>Practical Applications</h2>
+            <p>This concept is fundamental for tuning musical instruments and understanding the structure of modern music compositions. It's also crucial in the field of music production and sound engineering.</p>
+        </section>
+
+        <section>
+            <h2>Interactive Frequency Calculator</h2>
+            <p>Use the calculator below to determine the frequency of a note based on its MIDI number and to hear the note played back using the selected waveform.</p>
+            <input type="number" id="midiNote" placeholder="MIDI Note Number">
+            <select id="waveform">
+                <option value="sine">Sine</option>
+                <option value="square">Square</option>
+                <option value="sawtooth">Sawtooth</option>
+                <option value="triangle">Triangle</option>
+            </select>
+            <button id="calculate">Play Note</button>
+            <p>Frequency: <span id="frequency">-</span> Hz</p>
+        </section>
+
+        <section>
+            <h2>Conclusion</h2>
+            <p>The 12th root of 2 plays a pivotal role in music theory and practice, providing a standardized framework for musical expression across various genres and styles.</p>
+        </section>
+
+        <section>
+            <h2>Additional Resources</h2>
+            <ul>
+                <li><a href="#">Link to resource 1</a></li>
+                <li><a href="#">Link to resource 2</a></li>
+                <!-- Add more resources as needed -->
+            </ul>
+        </section>
+    </article>
+
+    <script>
+        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playFrequency(frequency, waveform) {
+            var oscillator = audioContext.createOscillator();
+            oscillator.type = waveform;
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime); 
+            oscillator.connect(audioContext.destination);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 2); // Stops after 2 seconds
+        }
+
+        document.getElementById("calculate").addEventListener("click", function() {
+            var midiNote = parseInt(document.getElementById("midiNote").value);
+            var waveform = document.getElementById("waveform").value;
+            var frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
+            document.getElementById("frequency").textContent = frequency.toFixed(2);
+            playFrequency(frequency, waveform);
+        });
+    </script>
+</body>
+</html>
+
