@@ -1,0 +1,94 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frequency Sound Generator</title>
+    <style>
+        /* Your CSS styles here */
+        body {
+          font-family: 'Arial', sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f7f7f7;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+        }
+
+        .container {
+          text-align: center;
+          background-color: #fff;
+          padding: 40px;
+          border-radius: 10px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+          max-width: 1200px;
+          width: 100%;
+          margin: 20px;
+        }
+
+        h1 {
+          color: #333;
+        }
+
+        button {
+          padding: 10px 20px;
+          font-size: 16px;
+          background-color: #5c6bc0;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+          margin-top: 10px;
+        }
+
+        button:hover {
+          background-color: #3f51b5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Frequency Sound Generator</h1>
+
+    <button onclick="playFrequency(174)">174Hz - Relieve Emotional/Physical Tension</button><br>
+    <button onclick="playFrequency(285)">285Hz - Increase Energy & Promote Recovery/Rejuvenation</button><br>
+    <button onclick="playFrequency(396)">396Hz - Let Go of Fear/Negative Vibrations</button><br>
+    <button onclick="playFrequency(417)">417Hz - Facilitate Change & Remove Negative Energy</button><br>
+    <button onclick="playFrequency(528)">528Hz - Miraculous Transformation, DNA Repair, Nature's Frequency, Associated with Heart</button><br>
+    <button onclick="playFrequency(639)">639Hz - Strengthens Relationships and Expression</button><br>
+    <button onclick="playFrequency(741)">741Hz - Problem Solving and Intellect</button><br>
+    <button onclick="playFrequency(852)">852Hz - Spiritual Balance & Intuition</button><br>
+    <button onclick="playFrequency(963)">963Hz - Awaken Highest Spirit & Clarity</button><br>
+    <button onclick="stopSound()">Stop Sound</button><br>
+</div>
+
+<script>
+    var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    var currentOscillator = null;
+
+    function playFrequency(frequency) {
+        stopSound();
+
+        var oscillator = audioContext.createOscillator();
+        oscillator.type = 'sine'; 
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        oscillator.connect(audioContext.destination);
+        oscillator.start();
+
+        currentOscillator = oscillator;
+    }
+
+    function stopSound() {
+        if (currentOscillator) {
+            currentOscillator.stop();
+            currentOscillator = null;
+        }
+    }
+</script>
+
+</body>
+</html>
+
