@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Key Display</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0; padding: 0; background-color: #f7f7f7;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+        }
+        .container {
+            text-align: center; background-color: #fff; padding: 40px; border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 1200px; width: 100%; margin: 20px;
+        }
+        h1, .note {
+            color: #333; margin-top: 20px;
+        }
+        .note {
+            display: inline-block; width: 24px; height: 24px; margin: 0 2px; vertical-align: middle;
+            padding: 2px 3px; color: white; border: 0;
+        }
+        .note_do { background: #c40233; }
+        .note_re { background: #e16b1a; }
+        .note_mi { background: #eac100; color: black; }
+        .note_fa { background: #00a368; }
+        .note_sol { background: #00b2b0; }
+        .note_la { background: #0088bf; }
+        .note_si { background: #624579; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MIDI Note Display</h1>
+        <div id="notesPlayed"></div>
+    </div>
+
+    <script>
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+
+            var resetColorTimer;
+            var notesPlayed = document.getElementById('notesPlayed');
+
+            function onMIDISuccess(midiAccess) {
+                for (var input of midiAccess.inputs.values()) {
+                    input.onmidimessage = getMIDIMessage;
+                }
+            }
+
+            function onMIDIFailure() {
+                notesPlayed.innerText = 'Could not access your MIDI devices.';
+            }
+
+            function getMIDIMessage(midiMessage) {
+                if (midiMessage.data[0] === 144 || midiMessage.data[0] === 128) {
+                    var noteNumber = midiMessage.data[1];
+                    var noteInfo = getNoteInfo(noteNumber);
+                    if (midiMessage.data[0] === 144 && midiMessage.data[2] !== 0) {
+                        var noteDiv = document.createElement('div');
+                        noteDiv.className = 'note ' + noteInfo.className;
+                        notesPlayed.appendChild(noteDiv);
+
+                        clearTimeout(resetColorTimer);
+                        resetColorTimer = setTimeout(function() {
+                            notesPlayed.innerHTML = '';
+                        }, 1000);
+                    }
+                }
+            }
+
+            function getNoteInfo(noteNumber) {
+                var scalePattern = {
+                    'Do': 'note_do',
+                    'Re': 'note_re',
+                    'Mi': 'note_mi',
+                    'Fa': 'note_fa',
+                    'Sol': 'note_sol',
+                    'La': 'note_la',
+                    'Si': 'note_si'
+                };
+
+                var offset = (noteNumber - 36) % 12;
+                var noteIndex = [0, 2, 4, 5, 7, 9, 11].indexOf(offset);
+                var noteName = Object.keys(scalePattern)[noteIndex];
+
+                return noteIndex !== -1 ? { className: scalePattern[noteName] } : { className: '' };
+            }
+        } else {
+            document.getElementById('notesPlayed').innerText = 'Web MIDI API not supported in this browser.';
+        }
+    </script>
+</body>
+</html>
+
