@@ -1,0 +1,575 @@
+
+<!DOCTYPE html>
+<html>
+<style>
+    body {
+        font-family: 'Arial', sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f7f7f7;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+
+    .container, .container2 {
+        text-align: center;
+        background-color: #fff;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        max-width: 1200px;
+        width: 100%;
+        margin: 20px;
+    }
+
+    h1 {
+        color: #333;
+    }
+
+    .word, .number, .definition, .input-group {
+        margin-top: 20px;
+    }
+
+    input[type="text"] {
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+        width: calc(100% - 22px);
+    }
+
+    input[type="submit"] {
+        padding: 10px 20px;
+        font-size: 16px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+        background-color: #5cb85c;
+        color: white;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    input[type="submit"]:hover {
+        background-color: #4cae4c;
+    }
+
+    .note_do, .note_re, .note_mi, .note_fa, .note_sol, .note_la, .note_si, .note_num, .note_rep {
+        padding: 2px 3px;
+        color: white;
+        border: 0;
+    }
+
+    .note_do { background: #c40233; }
+    .note_re { background: #e16b1a; }
+    .note_mi { background: #eac100; color: black; }
+    .note_fa { background: #00a368; }
+    .note_sol { background: #00b2b0; }
+    .note_la { background: #0088bf; }
+    .note_si { background: #624579; }
+    .note_num { background: #eee; color: black; }
+    .note_rep { background: #aaa; color: #444; }
+
+    .tri { background: #000; color: white; }
+    .pal { background: #676767; color: white; }
+    .dou { background: #ababab; }
+    .seq { background: #efefef; }
+
+    .square {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin: 0 2px;
+        vertical-align: middle;
+    }
+
+    .letter {
+        display: block;
+        color: white;
+        text-align: center;
+        line-height: 24px;
+    }
+
+    .letter.no-text {
+        visibility: hidden;
+    }
+
+    .translator-container {
+        background-color: #fff;
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+    }
+
+    textarea {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 16px;
+        font-size: 16px;
+        box-sizing: border-box;
+        border: 2px solid #ddd;
+        border-radius: 4px;
+        resize: vertical;
+    }
+
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #5c6bc0;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+        background-color: #3f51b5;
+    }
+
+    #translation {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #e8eaf6;
+        border: 1px solid #c5cae9;
+        border-radius: 4px;
+    }
+
+    strong {
+        color: #3f51b5;
+    }
+
+    #note, #input, #message {
+        font-size: 30px;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    .content-container {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    @media (max-width: 768px) {
+        .container, .container2 {
+            padding: 20px;
+            margin: 10px;
+        }
+        h1 {
+            font-size: 1.5em;
+        }
+        input[type="text"], textarea, button {
+            font-size: 14px;
+        }
+    }
+</style>
+
+<script>
+
+// Mapping syllables to numbers
+const syllableToNumber = {
+  'do': '1', 're': '2', 'mi': '3', 'fa': '4', 'sol': '5', 'la': '6', 'si': '7'
+};
+
+// Syllable to frequency mapping (in Hertz)
+const syllableFrequency = {
+  'do': 261.6,
+  're': 293.7,
+  'mi': 329.6,
+  'fa': 349.2,
+  'sol': 392.0,
+  'la': 440.0,
+  'si': 493.9
+};
+
+// Create a single AudioContext shared by the whole app
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// Function to get the word from the URL parameters
+function getWordFromURL() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('word'); // 'word' is the expected URL parameter
+}
+
+// Updated functions for handling multiple words
+
+function parseMultipleWordsToNumbers(words) {
+  let wordsArray = words.split(' ');
+  return wordsArray.map(word => {
+    let syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    return syllables ? syllables.map(syl => syllableToNumber[syl]).join('') : '';
+  }).join(' ');
+}
+
+function wrapMultipleWords(words) {
+  return words.split(' ').map(word => {
+    return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
+      return `<span class='note_${match}'>${match}</span>`;
+    });
+  }).join(' ');
+}
+
+// Function to create image elements for the syllables of multiple words from a specified folder
+function createImagesForMultipleWords(words, imageFolder) {
+  return words.split(' ').map(word => {
+    const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    if (!syllables) return '';
+    
+    return syllables.map(syl => {
+      const number = syllableToNumber[syl];
+      return `<img src="${imageFolder}/${number}.png" alt="${syl}" style="height:100px; width:50px;">`;
+    }).join('');
+  }).join(' ');
+}
+
+
+function createSquaresForMultipleWords(words, includeText, includeNumbers = false) {
+  return words.split(' ').map(word => {
+    return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
+      const number = includeNumbers ? syllableToNumber[match] : match;
+      const textClass = includeText ? 'letter' : 'letter no-text';
+      return `<span class='square note_${match}'>` +
+             `<span class='${textClass}'>${number}</span>` +
+             `</span>`;
+    });
+  }).join(' ');
+}
+
+// Function to display multiple words, their numerical representation, and definitions
+function displayMultipleWordsAndDefinitions() {
+  const word = getWordFromURL();
+  if (word) {
+    const searchWords = word.toLowerCase().split(' ');
+    const definitions = searchWords.map(searchWord => {
+      const definitionKey = Object.keys(dictionary).find(key => key.toLowerCase() === searchWord);
+      return definitionKey ? dictionary[definitionKey] : 'Definition not found.';
+    });
+
+    // Update elements with multiple words
+    const wordElement = document.getElementById('word');
+    const plainWordElement = document.getElementById('plainWord');
+    const coloredSquaresWithTextElement = document.getElementById('coloredSquaresWithText');
+    const coloredSquaresNoTextElement = document.getElementById('coloredSquaresNoText');
+    const coloredSquaresWithNumbersElement = document.getElementById('coloredSquaresWithNumbers');
+    const numberElement = document.getElementById('number');
+    const definitionElement = document.getElementById('definition');
+    
+    const syllableImagesElement = document.getElementById('syllableImages');
+	const syllableImagesElement2 = document.getElementById('syllableImages2'); // New div for second row
+	const syllableImagesElement3 = document.getElementById('syllableImages3'); 
+	const syllableImagesElement4 = document.getElementById('syllableImages4'); 
+
+
+    // Utilize the updated function for multiple words and two different folders
+	syllableImagesElement.innerHTML = createImagesForMultipleWords(word, 'images');
+	syllableImagesElement2.innerHTML = createImagesForMultipleWords(word, 'images2');
+	syllableImagesElement3.innerHTML = createImagesForMultipleWords(word, 'images3');
+	syllableImagesElement4.innerHTML = createImagesForMultipleWords(word, 'images4');
+    
+    
+    // Utilize the updated functions for multiple words
+    wordElement.innerHTML = wrapMultipleWords(word) || 'No word provided';
+    plainWordElement.textContent = word || 'No word provided';
+    coloredSquaresWithTextElement.innerHTML = createSquaresForMultipleWords(word, true);
+    coloredSquaresNoTextElement.innerHTML = createSquaresForMultipleWords(word, false);
+    coloredSquaresWithNumbersElement.innerHTML = createSquaresForMultipleWords(word, true, true);
+    numberElement.textContent = parseMultipleWordsToNumbers(word) || 'No number representation';
+    definitionElement.innerHTML = definitions.join('<br><br>'); // Join all definitions with two line breaks
+
+  }
+}
+
+// Function to handle the form submission
+function handleFormSubmit(event) {
+  event.preventDefault();
+  const wordInput = document.getElementById('wordInput').value.trim();
+  if (wordInput) {
+    const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?word=${encodeURIComponent(wordInput.toLowerCase())}`;
+    window.history.pushState({ path: newUrl }, '', newUrl);
+    displayMultipleWordsAndDefinitions(); // Call the updated function
+  }
+}
+
+// Function to play sound for a syllable
+function playSyllable(syllable, startTime) {
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(syllableFrequency[syllable] || 0, audioCtx.currentTime); // value in hertz
+  gainNode.gain.setValueAtTime(0, startTime);
+  gainNode.gain.linearRampToValueAtTime(1, startTime + 0.1);
+  gainNode.gain.linearRampToValueAtTime(0, startTime + 0.5);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + 0.6); // play for 0.6 seconds including fade out
+}
+
+// Function to play the entire word
+function playWord(word) {
+  const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+  if (!syllables) return;
+
+  let startTime = audioCtx.currentTime + 0.1; // short delay before starting
+  syllables.forEach((syllable) => {
+    playSyllable(syllable, startTime);
+    startTime += 0.6; // move to the next note time
+  });
+}
+
+// Function to play multiple words separated by spaces with a pause between them
+function playMultipleWords(words) {
+  const wordsArray = words.split(' ');
+  let delay = 0;
+
+  wordsArray.forEach((word) => {
+    setTimeout(() => playWord(word), delay);
+    const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    // Calculate the delay for the next word
+    // Assuming each syllable takes 0.6 seconds and adding an additional 0.5 seconds pause between words
+    delay += (syllables ? syllables.length * 600 : 0) + 500; // add delay based on number of syllables plus a pause
+  });
+}
+
+
+// Wrap the event listener setup in a DOMContentLoaded event to ensure the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Event listener for the Play Sound button
+  const playButton = document.getElementById('playSound');
+  if (playButton) {
+    playButton.addEventListener('click', () => {
+      const word = getWordFromURL();
+      if (word) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume(); // Attempt to resume the audio context if it is suspended
+        }
+        playMultipleWords(word.toLowerCase()); // Call the updated function
+      }
+    });
+  }
+
+  // Initial display function call
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', displayMultipleWordsAndDefinitions);
+  } else {
+    displayMultipleWordsAndDefinitions();
+  }
+});
+
+
+
+</script>
+
+
+
+
+
+</head>
+<body>
+
+<div class="content-container">
+
+<div class="container2">
+
+	<img src="http://solresol.xyz/Solresol2.png" alt="Solresol Image">
+	<div id="note"></div>
+	<div id="input"></div>
+	<div id="message"></div>
+
+</div>
+
+<div class="container2">
+
+
+	<h2>English to Solresol Translator</h2>
+	<textarea id="inputText" rows="4" placeholder="Enter English words (separated by spaces)"></textarea>
+	<button onclick="translateText()">Translate</button>
+	<div id="translation"></div>
+
+	
+	</div>
+
+	<div class="container">
+	
+	<h1>Lookup Solresol Word</h1>
+	<form onsubmit="handleFormSubmit(event)">
+	<div class="input-group">
+	<input type="text" id="wordInput" placeholder="Enter Solresol words" value="" required>
+	<input type="submit" value="Look Up">
+	</div>
+	</form>
+	
+	<div id="word" class="word">...</div>
+	<div id="plainWord" class="word">...</div>
+	<div id="coloredSquaresWithText" class="word">...</div>
+	<div id="coloredSquaresWithNumbers" class="word">...</div>
+	<div id="coloredSquaresNoText" class="word">...</div>
+	<div id="number" class="number"></div>
+	<div id="syllableImages" class="word"></div>
+	<div id="syllableImages2" class="word"></div> <!-- New div for second row of images -->
+	<div id="syllableImages3" class="word"></div>
+	<div id="syllableImages4" class="word"></div>
+	<div id="definition" class="definition"></div><br>
+	<button id="playSound">Play Sound</button>
+	
+	</div>
+	
+	
+	
+	    <!-- MIDI Key Display Container -->
+	    <div class="container">
+		<h1>MIDI Key Display</h1>
+		<div id="midiKey">Press key on MIDI</div>
+	    </div>
+
+	
+	
+
+</div>
+
+
+
+
+
+
+
+<script src="https://williamedwardhahn.github.io/solresol/solresol_dictionary.js"></script>
+
+
+
+
+<script>
+    function findFirstMatch(englishWord) {
+        for (const [solresolWord, englishTranslations] of Object.entries(dictionary)) {
+            const translationsArray = englishTranslations.toLowerCase().split(', ');
+            if (translationsArray.some(translation => translation.split(/\s+/).includes(englishWord.toLowerCase()))) {
+                return { solresolWord, englishTranslations };
+            }
+        }
+        return { solresolWord: '', englishTranslations: `No translation found for "${englishWord}"` };
+    }
+
+    function translateText() {
+        const text = document.getElementById('inputText').value.trim();
+        const words = text.split(/\s+/);
+        
+        const firstMatches = words.map(word => findFirstMatch(word));
+        const sentenceTranslation = firstMatches.map(match => match.solresolWord).join(' ').toLowerCase();
+        const detailedTranslations = firstMatches.map(match => `<strong>${match.solresolWord}:</strong> ${match.englishTranslations}`).join('<br>');
+
+        const translationUrl = `http://solresol.xyz/?word=${encodeURIComponent(sentenceTranslation)}`;
+        const fullTranslation = `
+            <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
+            
+            <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
+            <p><a href="${translationUrl}" target="_blank">Show in Dictionary</a></p>
+            `;
+
+        document.getElementById('translation').innerHTML = fullTranslation;
+    }
+</script>
+
+
+
+
+
+<script>
+
+
+    const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; // Frequencies for C4, D4, E4, F4, G4, A4, B4
+    const solresol = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
+
+    let currentNote = Math.floor(Math.random() * 7);
+    document.getElementById('note').textContent = solresol[currentNote];
+
+    function playTone(frequency) {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.value = frequency;
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(1, now + 0.1); // Attack
+        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.3); // Decay
+        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.7); // Sustain
+        gainNode.gain.linearRampToValueAtTime(0, now + 1); // Release
+
+        oscillator.start();
+
+        // Stop the oscillator after 1 second
+        setTimeout(() => oscillator.stop(), 1000);
+    }
+
+    window.addEventListener('keydown', function(event) {
+        if (event.keyCode >= 49 && event.keyCode <= 55) {
+            let inputNote = event.keyCode - 49;
+            document.getElementById('input').textContent = solresol[inputNote];
+
+            playTone(notes[inputNote]);
+
+            if (inputNote === currentNote) {
+                document.getElementById('message').textContent = 'Correct!';
+                currentNote = Math.floor(Math.random() * 7);
+                document.getElementById('note').textContent = solresol[currentNote];
+            } else {
+                document.getElementById('message').textContent = 'Incorrect, try again';
+            }
+        }
+    });
+</script>
+
+
+<script>
+
+    // MIDI Key Display Script
+    if (navigator.requestMIDIAccess) {
+        navigator.requestMIDIAccess().then(midiAccess => {
+            for (var input of midiAccess.inputs.values()) {
+                input.onmidimessage = midiMessage => {
+                    if (midiMessage.data[0] === 144 || midiMessage.data[0] === 128) {
+                        var noteNumber = midiMessage.data[1];
+                        var noteInfo = getNoteInfo(noteNumber);
+                        if (midiMessage.data[0] === 144 && midiMessage.data[2] !== 0) {
+                            document.getElementById('midiKey').innerText = noteInfo.name;
+                            document.body.style.backgroundColor = noteInfo.color;
+                        }
+                    }
+                };
+            }
+        });
+
+        function getNoteInfo(noteNumber) {
+            var scalePattern = {
+                'Do': '#c40233', 'Re': '#e16b1a', 'Mi': '#eac100',
+                'Fa': '#00a368', 'Sol': '#00b2b0', 'La': '#0088bf', 'Si': '#624579'
+            };
+            var offset = (noteNumber - 36) % 12;
+            var noteIndex = [0, 2, 4, 5, 7, 9, 11].indexOf(offset);
+            if (noteIndex !== -1) {
+                var noteName = Object.keys(scalePattern)[noteIndex];
+                return { name: noteName, color: scalePattern[noteName] };
+            } else {
+                return { name: 'Unknown Note', color: 'initial' };
+            }
+        }
+    } else {
+        document.getElementById('midiKey').innerText = 'err';
+    }
+
+</script>
+
+
+</body>
+</html>
