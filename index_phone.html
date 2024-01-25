@@ -155,19 +155,31 @@
         align-items: center;
     }
 
+    /* Mobile Responsive Adjustments */
     @media (max-width: 768px) {
         .container, .container2 {
             padding: 20px;
             margin: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        h1 {
+
+        h1, h2 {
             font-size: 1.5em;
         }
-        input[type="text"], textarea, button {
+
+        .word, .number, .definition, .input-group, 
+        input[type="text"], textarea, button, 
+        #note, #input, #message {
             font-size: 14px;
+        }
+
+        .translator-container, .content-container {
+            padding: 10px;
+            margin: 5px;
         }
     }
 </style>
+
 
 <script>
 
