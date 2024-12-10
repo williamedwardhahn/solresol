@@ -2,66 +2,85 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Solresol Translator & Dictionary</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" />
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+
 <style>
-:root {
-  --primary-bg: #f7f7f7;
-  --primary-color: #333;
-  --primary-accent: #5cb85c;
-  --secondary-accent: #3f51b5;
-  --container-bg: #fff;
-  --box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  --border-radius: 10px;
+/* -----------------------------------------------------
+   Base Reset and Typography
+-------------------------------------------------------*/
+html {
+  box-sizing: border-box;
+}
+*, *::before, *::after {
+  box-sizing: inherit;
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
-  background-color: var(--primary-bg);
+  background: #f7f7f7;
+  color: #333;
+}
+
+/* -----------------------------------------------------
+   Layout Structure
+-------------------------------------------------------*/
+.wrapper {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  color: var(--primary-color);
 }
 
-/* A wrapping container to center main content vertically on large screens */
-.wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+header, main, footer {
+  width: 100%;
+  margin: 0 auto;
 }
 
-/* Main content area */
-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px;
-}
-
-/* General container style */
+/* Containers for main content sections */
 .container, .container2 {
-  background-color: var(--container-bg);
+  background: #fff;
   padding: 40px;
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   max-width: 1200px;
   width: 100%;
-  margin: 20px;
+  margin: 20px auto;
   text-align: center;
 }
 
-h1, h2 {
-  color: #333;
-  margin-top: 0;
+@media (max-width: 768px) {
+  .container, .container2 {
+    padding: 20px;
+  }
 }
 
-/* Form and input styles */
+/* -----------------------------------------------------
+   Headings & Text
+-------------------------------------------------------*/
+h1, h2, h3 {
+  margin-top: 0;
+  color: #333;
+}
+h1 {
+  font-size: 1.8em;
+  margin-bottom: 20px;
+}
+h2 {
+  font-size: 1.5em;
+  margin-bottom: 16px;
+}
+
+/* Instructions, messages, etc. */
+#message {
+  font-size: 1.2em;
+  margin-top: 10px;
+}
+
+/* -----------------------------------------------------
+   Forms & Inputs
+-------------------------------------------------------*/
 .input-group {
   margin: 20px 0;
 }
@@ -70,21 +89,25 @@ input[type="text"], textarea {
   width: 100%;
   padding: 10px;
   font-size: 16px;
-  border-radius: 5px;
   border: 1px solid #ddd;
+  border-radius: 5px;
   box-sizing: border-box;
+  margin-bottom: 10px;
 }
 
-/* Buttons */
+textarea {
+  resize: vertical;
+}
+
 button, input[type="submit"] {
   padding: 10px 20px;
   font-size: 16px;
-  border-radius: 5px;
   border: 1px solid #ddd;
-  background-color: var(--primary-accent);
-  color: white;
+  border-radius: 5px;
+  background-color: #5cb85c;
+  color: #fff;
   cursor: pointer;
-  margin-top: 10px;
+  margin-top: 5px;
   transition: background-color 0.3s ease;
 }
 
@@ -92,6 +115,9 @@ button:hover, input[type="submit"]:hover {
   background-color: #4cae4c;
 }
 
+/* -----------------------------------------------------
+   Translator Output
+-------------------------------------------------------*/
 #translation {
   margin-top: 20px;
   padding: 10px;
@@ -102,69 +128,143 @@ button:hover, input[type="submit"]:hover {
 }
 
 strong {
-  color: var(--secondary-accent);
+  color: #3f51b5;
 }
 
-/* Colored notes */
-.note_do { background: #c40233; color: #fff; }
-.note_re { background: #e16b1a; color: #fff; }
-.note_mi { background: #eac100; color: #000; }
-.note_fa { background: #00a368; color: #fff; }
-.note_sol { background: #00b2b0; color: #fff; }
-.note_la { background: #0088bf; color: #fff; }
-.note_si { background: #624579; color: #fff; }
-.note_num { background: #eee; color: #000; }
-.note_rep { background: #aaa; color: #444; }
-
-/* Other backgrounds */
-.tri { background: #000; color: #fff; }
-.pal { background: #676767; color: #fff; }
-.dou { background: #ababab; }
-.seq { background: #efefef; }
-
+/* -----------------------------------------------------
+   Solresol Display Styles
+   Squares, notes, colors
+-------------------------------------------------------*/
 .square {
   display: inline-block;
   width: 24px;
   height: 24px;
-  margin: 0 2px;
+  margin: 2px;
   vertical-align: middle;
   border-radius: 4px;
+  font-size: 14px;
+  line-height: 24px;
+  text-align: center;
 }
 
 .letter {
   display: block;
-  text-align: center;
-  line-height: 24px;
-  color: white;
+  color: #fff;
 }
 
 .letter.no-text {
   visibility: hidden;
 }
 
-/* Translator container */
-.translator-container {
-  background-color: var(--container-bg);
-  max-width: 600px;
-  margin: 20px auto;
-  padding: 20px;
-  box-shadow: var(--box-shadow);
-  border-radius: 8px;
-  text-align: center;
+/* Note colors */
+.note_do { background: #c40233; }
+.note_re { background: #e16b1a; }
+.note_mi { background: #eac100; color: #000; }
+.note_fa { background: #00a368; }
+.note_sol { background: #00b2b0; }
+.note_la { background: #0088bf; }
+.note_si { background: #624579; }
+
+/* Optional notes (not widely used but retained) */
+.note_num { background: #eee; color: #000; }
+.note_rep { background: #aaa; color: #444; }
+
+/* -----------------------------------------------------
+   Sections
+-------------------------------------------------------*/
+.word, .number, .definition {
+  margin-top: 20px;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .container, .container2 {
-    padding: 20px;
-  }
-  h1, h2 {
-    font-size: 1.5em;
-  }
+/* Images */
+#syllableImages img, 
+#syllableImages2 img, 
+#syllableImages3 img, 
+#syllableImages4 img {
+  max-height: 100px;
+  width: auto;
+  margin: 5px;
+  vertical-align: middle;
+}
+
+/* -----------------------------------------------------
+   MIDI Key Display
+-------------------------------------------------------*/
+#midiKey {
+  font-size: 1.2em;
+  margin-top: 10px;
 }
 </style>
+</head>
+<body>
+<div class="wrapper">
+  
+<header class="container2">
+  <!-- Introduction / Logo / Note Guessing Game -->
+  <img src="http://solresol.xyz/Solresol2.png" alt="Solresol Logo" style="max-width:200px; margin-bottom:20px;">
+  <h2>Guess the Solresol Note</h2>
+  <p>Press keys 1 to 7 on your keyboard to guess the displayed note.</p>
+  <div id="note" aria-live="polite" style="font-size: 1.5em; margin-top: 10px;"></div>
+  <div id="input" style="font-size: 1.2em; margin-top:10px;"></div>
+  <div id="message" aria-live="polite"></div>
+</header>
+
+<main>
+  <!-- Translator Section -->
+  <section class="container2" aria-labelledby="translator-title">
+    <h2 id="translator-title">English to Solresol Translator</h2>
+    <p>Type English words separated by spaces, then click "Translate" to see their Solresol equivalents and dictionary links.</p>
+    <textarea id="inputText" rows="4" placeholder="Enter English words here..." aria-label="English Input"></textarea>
+    <button onclick="translateText()">Translate</button>
+    <div id="translation"></div>
+  </section>
+
+  <!-- Dictionary Lookup Section -->
+  <section class="container" aria-labelledby="lookup-title">
+    <h1 id="lookup-title">Lookup Solresol Word</h1>
+    <p>Enter Solresol words (like 'dore', 'mila', etc.) to see their representation and definitions.</p>
+    <form onsubmit="handleFormSubmit(event)" aria-label="Solresol Lookup Form">
+      <div class="input-group">
+        <input type="text" id="wordInput" placeholder="Enter Solresol words" required aria-label="Solresol Word Input">
+        <input type="submit" value="Look Up">
+      </div>
+    </form>
+    
+    <div id="word" class="word">...</div>
+    <div id="plainWord" class="word">...</div>
+    <div id="coloredSquaresWithText" class="word">...</div>
+    <div id="coloredSquaresWithNumbers" class="word">...</div>
+    <div id="coloredSquaresNoText" class="word">...</div>
+    <div id="number" class="number"></div>
+    <div id="syllableImages" class="word"></div>
+    <div id="syllableImages2" class="word"></div>
+    <div id="syllableImages3" class="word"></div>
+    <div id="syllableImages4" class="word"></div>
+    <div id="definition" class="definition"></div>
+    <br>
+    <button id="playSound">Play Sound</button>
+  </section>
+
+  <!-- MIDI Key Display Section -->
+  <section class="container" aria-labelledby="midi-title">
+    <h1 id="midi-title">MIDI Key Display</h1>
+    <p>Press a MIDI key to see its corresponding Solresol note.</p>
+    <div id="midiKey" aria-live="polite">Press a key on MIDI</div>
+  </section>
+</main>
+
+<footer style="text-align:center; padding:20px; font-size:0.9em; color:#666;">
+  &copy; 2024 Solresol Tools. All features retained and improved.
+</footer>
+</div>
+
+<!-- Dictionary Data -->
+<script src="https://williamedwardhahn.github.io/solresol/solresol_dictionary.js"></script>
+
 <script>
-// Mapping syllables to numbers and frequencies
+// -----------------------------------------------------
+// Global Data & Audio Setup
+// -----------------------------------------------------
 const syllableToNumber = {
   'do': '1', 're': '2', 'mi': '3', 'fa': '4', 'sol': '5', 'la': '6', 'si': '7'
 };
@@ -181,24 +281,25 @@ const syllableFrequency = {
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-// Get word from URL
+// -----------------------------------------------------
+// Helper Functions
+// -----------------------------------------------------
 function getWordFromURL() {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get('word');
 }
 
 function parseMultipleWordsToNumbers(words) {
-  let wordsArray = words.split(' ');
-  return wordsArray.map(word => {
-    let syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
-    return syllables ? syllables.map(syl => syllableToNumber[syl]).join('') : '';
+  return words.split(' ').map(word => {
+    const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
+    return syllables ? syllables.map(s => syllableToNumber[s]).join('') : '';
   }).join(' ');
 }
 
 function wrapMultipleWords(words) {
   return words.split(' ').map(word => {
-    return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
-      return `<span class='note_${match} square letter'>${match}</span>`;
+    return word.replace(/(do|re|mi|fa|sol|la|si)/g, match => {
+      return `<span class='square note_${match}'><span class='letter'>${match}</span></span>`;
     });
   }).join(' ');
 }
@@ -207,17 +308,16 @@ function createImagesForMultipleWords(words, imageFolder) {
   return words.split(' ').map(word => {
     const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
     if (!syllables) return '';
-    
     return syllables.map(syl => {
       const number = syllableToNumber[syl];
-      return `<img src="${imageFolder}/${number}.png" alt="Syllable ${syl}" style="height:100px; width:50px;">`;
+      return `<img src="${imageFolder}/${number}.png" alt="${syl} image">`;
     }).join('');
   }).join(' ');
 }
 
 function createSquaresForMultipleWords(words, includeText, includeNumbers = false) {
   return words.split(' ').map(word => {
-    return word.replace(/(do|re|mi|fa|sol|la|si)/g, (match) => {
+    return word.replace(/(do|re|mi|fa|sol|la|si)/g, match => {
       const number = includeNumbers ? syllableToNumber[match] : match;
       const textClass = includeText ? 'letter' : 'letter no-text';
       return `<span class='square note_${match}'><span class='${textClass}'>${number}</span></span>`;
@@ -225,14 +325,16 @@ function createSquaresForMultipleWords(words, includeText, includeNumbers = fals
   }).join(' ');
 }
 
-// Display the word and definitions
+// -----------------------------------------------------
+// Dictionary Display
+// -----------------------------------------------------
 function displayMultipleWordsAndDefinitions() {
   const word = getWordFromURL();
   if (word) {
     const searchWords = word.toLowerCase().split(' ');
-    const definitions = searchWords.map(searchWord => {
-      const definitionKey = Object.keys(dictionary).find(key => key.toLowerCase() === searchWord);
-      return definitionKey ? dictionary[definitionKey] : 'Definition not found.';
+    const definitions = searchWords.map(sw => {
+      const key = Object.keys(dictionary).find(k => k.toLowerCase() === sw);
+      return key ? dictionary[key] : 'Definition not found.';
     });
 
     document.getElementById('word').innerHTML = wrapMultipleWords(word) || 'No word provided';
@@ -242,8 +344,8 @@ function displayMultipleWordsAndDefinitions() {
     document.getElementById('coloredSquaresWithNumbers').innerHTML = createSquaresForMultipleWords(word, true, true);
     document.getElementById('number').textContent = parseMultipleWordsToNumbers(word) || 'No number representation';
     document.getElementById('definition').innerHTML = definitions.join('<br><br>');
-
-    // Update images
+    
+    // Update images for all four image folders
     document.getElementById('syllableImages').innerHTML = createImagesForMultipleWords(word, 'images');
     document.getElementById('syllableImages2').innerHTML = createImagesForMultipleWords(word, 'images2');
     document.getElementById('syllableImages3').innerHTML = createImagesForMultipleWords(word, 'images3');
@@ -251,6 +353,9 @@ function displayMultipleWordsAndDefinitions() {
   }
 }
 
+// -----------------------------------------------------
+// Form Handling
+// -----------------------------------------------------
 function handleFormSubmit(event) {
   event.preventDefault();
   const wordInput = document.getElementById('wordInput').value.trim();
@@ -261,18 +366,22 @@ function handleFormSubmit(event) {
   }
 }
 
+// -----------------------------------------------------
+// Audio Playback for Syllables
+// -----------------------------------------------------
 function playSyllable(syllable, startTime) {
   const oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
-
   oscillator.type = 'sine';
   oscillator.frequency.setValueAtTime(syllableFrequency[syllable] || 0, audioCtx.currentTime);
+  
   gainNode.gain.setValueAtTime(0, startTime);
   gainNode.gain.linearRampToValueAtTime(1, startTime + 0.1);
   gainNode.gain.linearRampToValueAtTime(0, startTime + 0.5);
 
   oscillator.connect(gainNode);
   gainNode.connect(audioCtx.destination);
+  
   oscillator.start(startTime);
   oscillator.stop(startTime + 0.6);
 }
@@ -280,9 +389,9 @@ function playSyllable(syllable, startTime) {
 function playWord(word) {
   const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
   if (!syllables) return;
-
+  
   let startTime = audioCtx.currentTime + 0.1;
-  syllables.forEach((syllable) => {
+  syllables.forEach(syllable => {
     playSyllable(syllable, startTime);
     startTime += 0.6;
   });
@@ -291,68 +400,24 @@ function playWord(word) {
 function playMultipleWords(words) {
   const wordsArray = words.split(' ');
   let delay = 0;
-
-  wordsArray.forEach((word) => {
+  
+  wordsArray.forEach(word => {
     setTimeout(() => playWord(word), delay);
     const syllables = word.match(/(do|re|mi|fa|sol|la|si)/g);
     delay += (syllables ? syllables.length * 600 : 0) + 500;
   });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const playButton = document.getElementById('playSound');
-  if (playButton) {
-    playButton.addEventListener('click', () => {
-      const word = getWordFromURL();
-      if (word) {
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-        playMultipleWords(word.toLowerCase());
-      }
-    });
-  }
-
-  displayMultipleWordsAndDefinitions();
-});
-
-// Translator Functions
-function findFirstMatch(englishWord) {
-  for (const [solresolWord, englishTranslations] of Object.entries(dictionary)) {
-    const translationsArray = englishTranslations.toLowerCase().split(', ');
-    if (translationsArray.some(translation => translation.split(/\s+/).includes(englishWord.toLowerCase()))) {
-      return { solresolWord, englishTranslations };
-    }
-  }
-  return { solresolWord: '', englishTranslations: `No translation found for "${englishWord}"` };
-}
-
-function translateText() {
-  const text = document.getElementById('inputText').value.trim();
-  const words = text.split(/\s+/);
-  
-  const firstMatches = words.map(word => findFirstMatch(word));
-  const sentenceTranslation = firstMatches.map(match => match.solresolWord).join(' ').toLowerCase();
-  const detailedTranslations = firstMatches.map(match => `<strong>${match.solresolWord}:</strong> ${match.englishTranslations}`).join('<br>');
-
-  const translationUrl = `http://solresol.xyz/?word=${encodeURIComponent(sentenceTranslation)}`;
-  const fullTranslation = `
-    <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
-    <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
-    <p><a href="${translationUrl}" target="_blank" rel="noopener noreferrer">Show in Dictionary</a></p>
-  `;
-  document.getElementById('translation').innerHTML = fullTranslation;
-}
-
-// MIDI Key Display
-const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; 
+// -----------------------------------------------------
+// Guess the Note Game
+// -----------------------------------------------------
+const notes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88];
 const solresol = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
-
 let currentNote = Math.floor(Math.random() * 7);
 
-document.addEventListener('DOMContentLoaded', () => {
+function updateCurrentNote() {
   document.getElementById('note').textContent = solresol[currentNote];
-});
+}
 
 function playTone(frequency) {
   const oscillator = audioCtx.createOscillator();
@@ -360,7 +425,6 @@ function playTone(frequency) {
 
   oscillator.type = 'sine';
   oscillator.frequency.value = frequency;
-
   oscillator.connect(gainNode);
   gainNode.connect(audioCtx.destination);
 
@@ -379,23 +443,24 @@ window.addEventListener('keydown', function(event) {
   if (event.keyCode >= 49 && event.keyCode <= 55) {
     let inputNote = event.keyCode - 49;
     document.getElementById('input').textContent = solresol[inputNote];
-
     playTone(notes[inputNote]);
 
     if (inputNote === currentNote) {
       document.getElementById('message').textContent = 'Correct!';
       currentNote = Math.floor(Math.random() * 7);
-      document.getElementById('note').textContent = solresol[currentNote];
+      updateCurrentNote();
     } else {
-      document.getElementById('message').textContent = 'Incorrect, try again';
+      document.getElementById('message').textContent = 'Incorrect, try again.';
     }
   }
 });
 
-// MIDI Handling
+// -----------------------------------------------------
+// MIDI Integration
+// -----------------------------------------------------
 if (navigator.requestMIDIAccess) {
   navigator.requestMIDIAccess().then(midiAccess => {
-    for (var input of midiAccess.inputs.values()) {
+    for (let input of midiAccess.inputs.values()) {
       input.onmidimessage = midiMessage => {
         if (midiMessage.data[0] === 144 || midiMessage.data[0] === 128) {
           var noteNumber = midiMessage.data[1];
@@ -426,59 +491,58 @@ if (navigator.requestMIDIAccess) {
 } else {
   document.getElementById('midiKey').innerText = 'MIDI not supported.';
 }
+
+// -----------------------------------------------------
+// Translator Logic
+// -----------------------------------------------------
+function findFirstMatch(englishWord) {
+  for (const [solresolWord, englishTranslations] of Object.entries(dictionary)) {
+    const translationsArray = englishTranslations.toLowerCase().split(', ');
+    if (translationsArray.some(tr => tr.split(/\s+/).includes(englishWord.toLowerCase()))) {
+      return { solresolWord, englishTranslations };
+    }
+  }
+  return { solresolWord: '', englishTranslations: `No translation found for "${englishWord}"` };
+}
+
+function translateText() {
+  const text = document.getElementById('inputText').value.trim();
+  const words = text.split(/\s+/);
+
+  const firstMatches = words.map(word => findFirstMatch(word));
+  const sentenceTranslation = firstMatches.map(match => match.solresolWord).join(' ').toLowerCase();
+  const detailedTranslations = firstMatches.map(match => `<strong>${match.solresolWord}:</strong> ${match.englishTranslations}`).join('<br>');
+
+  const translationUrl = `http://solresol.xyz/?word=${encodeURIComponent(sentenceTranslation)}`;
+  const fullTranslation = `
+    <p><strong>Sentence in Solresol:</strong> ${sentenceTranslation}</p>
+    <p><strong>Word-by-word Translations:</strong><br>${detailedTranslations}</p>
+    <p><a href="${translationUrl}" target="_blank" rel="noopener noreferrer">Show in Dictionary</a></p>
+  `;
+  document.getElementById('translation').innerHTML = fullTranslation;
+}
+
+// -----------------------------------------------------
+// Initial Load
+// -----------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  updateCurrentNote();
+  displayMultipleWordsAndDefinitions();
+  
+  const playButton = document.getElementById('playSound');
+  if (playButton) {
+    playButton.addEventListener('click', () => {
+      const word = getWordFromURL();
+      if (word) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        playMultipleWords(word.toLowerCase());
+      }
+    });
+  }
+});
 </script>
-</head>
-<body>
-<div class="wrapper">
-<main>
-  <!-- Top Container with Image and Guessing Game -->
-  <section class="container2">
-    <img src="http://solresol.xyz/Solresol2.png" alt="Solresol Logo">
-    <div id="note"></div>
-    <div id="input"></div>
-    <div id="message"></div>
-  </section>
 
-  <!-- Translator Section -->
-  <section class="container2 translator-container">
-    <h2>English to Solresol Translator</h2>
-    <textarea id="inputText" rows="4" placeholder="Enter English words (separated by spaces)"></textarea>
-    <button onclick="translateText()">Translate</button>
-    <div id="translation"></div>
-  </section>
-
-  <!-- Dictionary Lookup Section -->
-  <section class="container">
-    <h1>Lookup Solresol Word</h1>
-    <form onsubmit="handleFormSubmit(event)">
-      <div class="input-group">
-        <input type="text" id="wordInput" placeholder="Enter Solresol words" required>
-        <input type="submit" value="Look Up">
-      </div>
-    </form>
-
-    <div id="word" class="word">...</div>
-    <div id="plainWord" class="word">...</div>
-    <div id="coloredSquaresWithText" class="word">...</div>
-    <div id="coloredSquaresWithNumbers" class="word">...</div>
-    <div id="coloredSquaresNoText" class="word">...</div>
-    <div id="number" class="number"></div>
-    <div id="syllableImages" class="word"></div>
-    <div id="syllableImages2" class="word"></div>
-    <div id="syllableImages3" class="word"></div>
-    <div id="syllableImages4" class="word"></div>
-    <div id="definition" class="definition"></div><br>
-    <button id="playSound">Play Sound</button>
-  </section>
-
-  <!-- MIDI Key Display Section -->
-  <section class="container">
-    <h1>MIDI Key Display</h1>
-    <div id="midiKey">Press a key on MIDI</div>
-  </section>
-</main>
-</div>
-
-<script src="https://williamedwardhahn.github.io/solresol/solresol_dictionary.js"></script>
 </body>
 </html>
