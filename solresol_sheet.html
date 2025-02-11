@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Solfege to SVG Sheet Music (Larger)</title>
+  <style>
+    body { font-family: sans-serif; }
+    svg { border: 1px solid #ccc; margin: 20px; }
+    /* Color definitions for note heads */
+    .note_do { fill: #c40233; }
+    .note_re { fill: #e16b1a; }
+    .note_mi { fill: #eac100; color: #000; }
+    .note_fa { fill: #00a368; }
+    .note_sol { fill: #00b2b0; }
+    .note_la { fill: #0088bf; }
+    .note_si { fill: #624579; }
+  </style>
+</head>
+<body>
+  <h1>Solfege Sheet Music (Larger Image)</h1>
+  <p>
+    Pass a solfege string in the URL query parameter “solfege” (for example,
+    <code>?solfege=do,re,mi,fa,so,la,si,do</code>).
+  </p>
+  <div id="sheet"></div>
+
+  <script>
+    // Create an element in the SVG namespace with given attributes.
+    function createSVGElement(tag, attributes) {
+      const el = document.createElementNS(svgNS, tag);
+      for (const attr in attributes) {
+        el.setAttribute(attr, attributes[attr]);
+      }
+      return el;
+    }
+
+    const svgNS = "http://www.w3.org/2000/svg";
+
+    // Get the solfege string from the URL, defaulting if not provided.
+    const params = new URLSearchParams(window.location.search);
+    const solfegeString = params.get('solfege') || 'do,re,mi,fa,so,la,si,do';
+    const solfegeArray = solfegeString.split(',').map(s => s.trim().toLowerCase());
+
+    // Map solfege syllables to scale degrees (do = 0, re = 1, …, si = 6).
+    const solfegeToDegree = {
+      'do': 0,
+      're': 1,
+      'mi': 2,
+      'fa': 3,
+      'so': 4,
+      'la': 5,
+      'si': 6
+    };
+
+    // Vertical note positioning:
+    // Staff lines (top to bottom): 113.347, 118.347, 123.347, 128.347, 133.347.
+    // Middle C ("do") is positioned one ledger line below the staff.
+    const stepY = 2.5;
+    const baseY = 138.347;  // Position for "do"
+    function getNoteY(syllable) {
+      const degree = solfegeToDegree[syllable];
+      if (degree === undefined) return null;
+      return baseY - (degree * stepY);
+    }
+
+    // Horizontal positioning: notes are spaced 40 units apart.
+    const noteSpacing = 40;
+    const startX = 28.346 + 20;
+    const notes = solfegeArray.map((syl, i) => {
+      return { x: startX + i * noteSpacing, y: getNoteY(syl), syl: syl };
+    });
+
+    // Create the SVG element with doubled width and height.
+    const svg = createSVGElement("svg", {
+      width: "1224",
+      height: "1584",
+      viewBox: "0 0 612 792"
+    });
+
+    // Draw the staff lines.
+    function drawStaff() {
+      const staffX1 = 28.346;
+      const staffX2 = 28.346 + 555.308;
+      const staffLinesY = [113.347, 118.347, 123.347, 128.347, 133.347];
+      staffLinesY.forEach(y => {
+        const line = createSVGElement("line", {
+          x1: staffX1,
+          y1: y,
+          x2: staffX2,
+          y2: y,
+          stroke: "black",
+          "stroke-width": ".4"
+        });
+        svg.appendChild(line);
+      });
+      return staffLinesY;
+    }
+    const staffLinesY = drawStaff();
+
+    // Draw ledger lines for notes that fall outside the staff.
+    function drawLedgerLines(note) {
+      if (note.y > staffLinesY[staffLinesY.length - 1] || note.y < staffLinesY[0]) {
+        const ledger = createSVGElement("line", {
+          x1: note.x - 10,
+          y1: note.y,
+          x2: note.x + 10,
+          y2: note.y,
+          stroke: "black",
+          "stroke-width": ".4"
+        });
+        svg.appendChild(ledger);
+      }
+    }
+
+    // Draw each note head, its stem, and the solfege label.
+    function drawNotes() {
+      notes.forEach(note => {
+        drawLedgerLines(note);
+
+        // Create the note head.
+        const noteHead = createSVGElement("ellipse", {
+          cx: note.x,
+          cy: note.y,
+          rx: "5",
+          ry: "3.5"
+        });
+        // Map syllables: "so" uses note_sol and "si" (or "ti") uses note_si.
+        let noteClass;
+        if (note.syl === "si") {
+          noteClass = "note_si";
+        } else if (note.syl === "so") {
+          noteClass = "note_sol";
+        } else {
+          noteClass = "note_" + note.syl;
+        }
+        noteHead.classList.add(noteClass);
+        svg.appendChild(noteHead);
+
+        // Draw the stem: upward for lower notes (y > 123.347), downward otherwise.
+        let stem;
+        if (note.y > 123.347) {
+          stem = createSVGElement("line", {
+            x1: note.x + 5,
+            y1: note.y,
+            x2: note.x + 5,
+            y2: note.y - 35,
+            stroke: "black",
+            "stroke-width": "1.5"
+          });
+        } else {
+          stem = createSVGElement("line", {
+            x1: note.x - 5,
+            y1: note.y,
+            x2: note.x - 5,
+            y2: note.y + 35,
+            stroke: "black",
+            "stroke-width": "1.5"
+          });
+        }
+        svg.appendChild(stem);
+
+        // Add the solfege label text.
+        const textEl = createSVGElement("text", {
+          "font-size": "10",
+          fill: "blue",
+          x: note.x - 3,
+          y: (note.y > 123.347) ? note.y + 12 : note.y - 10
+        });
+        textEl.textContent = note.syl;
+        svg.appendChild(textEl);
+      });
+    }
+    drawNotes();
+
+    // Append the SVG to the container.
+    document.getElementById("sheet").appendChild(svg);
+  </script>
+</body>
+</html>
+
