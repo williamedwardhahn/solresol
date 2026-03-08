@@ -64,14 +64,15 @@ export function playNote(syllable, opts = {}) {
  * Play a sequence of syllables
  * @param {string[]} syllables - array of syllable strings
  * @param {object} opts - same as playNote plus tempo
- * @param {number} opts.tempo - notes per second (default 2.5)
+ * @param {number} opts.tempo - notes per second (default 2.5, clamped 0.1–10)
  */
 export function playWord(syllables, opts = {}) {
   const ctx = getContext();
   if (!ctx) return;
 
   const { tempo = 2.5, ...noteOpts } = opts;
-  const interval = 1 / tempo;
+  const safeTempo = Math.max(0.1, Math.min(10, tempo || 2.5));
+  const interval = 1 / safeTempo;
 
   syllables.forEach((syl, i) => {
     playNote(syl, {
@@ -80,4 +81,31 @@ export function playWord(syllables, opts = {}) {
       startTime: ctx.currentTime + i * interval,
     });
   });
+}
+
+/**
+ * Play multiple words as a sentence with pauses between words.
+ * @param {string[][]} words - array of syllable arrays (one per word)
+ * @param {object} opts - same as playWord plus wordGap
+ * @param {number} opts.wordGap - seconds between words (default 0.5)
+ */
+export function playSentence(words, opts = {}) {
+  const ctx = getContext();
+  if (!ctx) return;
+
+  const { tempo = 2.5, wordGap = 0.5, ...noteOpts } = opts;
+  const safeTempo = Math.max(0.1, Math.min(10, tempo || 2.5));
+  const interval = 1 / safeTempo;
+  let offset = 0;
+
+  for (const syllables of words) {
+    syllables.forEach((syl, i) => {
+      playNote(syl, {
+        ...noteOpts,
+        duration: interval * 0.9,
+        startTime: ctx.currentTime + offset + i * interval,
+      });
+    });
+    offset += syllables.length * interval + wordGap;
+  }
 }

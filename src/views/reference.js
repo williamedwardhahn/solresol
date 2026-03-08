@@ -110,8 +110,15 @@ export function renderReference(container) {
 
     card.style.cursor = 'pointer';
     card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', `Play ${note}`);
     card.addEventListener('click', () => playNote(note, { duration: 0.6 }));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        playNote(note, { duration: 0.6 });
+      }
+    });
     notesGrid.appendChild(card);
   }
 

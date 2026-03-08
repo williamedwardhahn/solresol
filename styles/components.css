@@ -45,6 +45,32 @@
 .midi-key:hover { transform: scale(1.08); }
 .midi-key:active { transform: scale(0.95); }
 
+.quiz-hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.quiz-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0.75rem 0;
+}
+
+.quiz-choice-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--border);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 /* === Quiz === */
 .quiz-options {
   display: flex;
@@ -144,7 +170,19 @@
   margin-top: 0.5rem;
 }
 
-.midi-actions {
+.midi-controls {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
   margin-top: 1rem;
-  text-align: center;
+}
+
+.midi-control-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
 }

@@ -1,6 +1,8 @@
-import { getAllEntries, parseWord } from '../utils/solresol.js';
+import { getAllEntries, parseWord, translate } from '../utils/solresol.js';
 import { createWordBlocks } from '../components/color-block.js';
+import { createSheetMusic } from '../components/sheet-music.js';
 import { playWord } from '../audio/synth.js';
+import { getHashParams } from '../app.js';
 
 const PAGE_SIZE = 50;
 
@@ -81,6 +83,12 @@ export function renderDictionary(container) {
     countEl.textContent = `${filtered.length} entries`;
     listEl.innerHTML = '';
 
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<p class="no-results">No matching entries</p>';
+      pagerEl.innerHTML = '';
+      return;
+    }
+
     for (const entry of pageEntries) {
       const row = document.createElement('div');
       row.className = 'dict-row';
@@ -104,6 +112,12 @@ export function renderDictionary(container) {
       playBtn.innerHTML = '&#9654;';
       playBtn.setAttribute('aria-label', `Play ${entry.solresol}`);
       playBtn.addEventListener('click', () => playWord(syllables));
+
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.btn')) return; // don't trigger on play button
+        showDetail(entry, row);
+      });
 
       row.append(wordCol, blocksCol, defCol, playBtn);
       listEl.appendChild(row);
@@ -140,5 +154,50 @@ export function renderDictionary(container) {
   syllableSelect.addEventListener('change', applyFilters);
   startSelect.addEventListener('change', applyFilters);
 
+  // Deep-link support: #dictionary?word=dofami
+  const params = getHashParams();
+  if (params.word) {
+    searchInput.value = params.word;
+  }
+
   applyFilters();
+
+  // If deep-linked, auto-expand the first match
+  if (params.word && filtered.length > 0) {
+    const match = filtered.find(e => e.solresol.toLowerCase() === params.word.toLowerCase());
+    if (match) showDetail(match, listEl.querySelector('.dict-row'));
+  }
+
+  function showDetail(entry, rowEl) {
+    // Toggle: close if already open
+    const existing = rowEl.nextElementSibling;
+    if (existing && existing.classList.contains('dict-detail')) {
+      existing.remove();
+      return;
+    }
+
+    // Close any other open detail
+    container.querySelectorAll('.dict-detail').forEach(d => d.remove());
+
+    const syllables = parseWord(entry.solresol);
+    const detail = document.createElement('div');
+    detail.className = 'dict-detail';
+
+    const blocks = createWordBlocks(syllables, { size: 'md' });
+    const blocksNum = createWordBlocks(syllables, { size: 'md', showNumber: true });
+
+    const defEl = document.createElement('p');
+    defEl.className = 'dict-detail-def';
+    defEl.textContent = entry.definition || 'No definition available';
+
+    const playDetailBtn = document.createElement('button');
+    playDetailBtn.className = 'btn btn--sm';
+    playDetailBtn.innerHTML = '&#9654; Play';
+    playDetailBtn.addEventListener('click', () => playWord(syllables));
+
+    const sheet = createSheetMusic(syllables);
+
+    detail.append(blocks, blocksNum, defEl, playDetailBtn, sheet);
+    rowEl.after(detail);
+  }
 }

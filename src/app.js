@@ -16,7 +16,17 @@ const DEFAULT_ROUTE = 'translator';
 let currentCleanup = null;
 
 function getRoute() {
-  return window.location.hash.slice(1) || DEFAULT_ROUTE;
+  const hash = window.location.hash.slice(1);
+  const [route] = hash.split('?');
+  return route || DEFAULT_ROUTE;
+}
+
+/** Get query params from hash, e.g. #dictionary?word=dore → { word: 'dore' } */
+export function getHashParams() {
+  const hash = window.location.hash.slice(1);
+  const qIdx = hash.indexOf('?');
+  if (qIdx === -1) return {};
+  return Object.fromEntries(new URLSearchParams(hash.slice(qIdx + 1)));
 }
 
 function navigate(route) {

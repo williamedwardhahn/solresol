@@ -17,8 +17,17 @@ export function renderMidiLab(container) {
         <div id="midi-translation" class="midi-translation" aria-live="polite"></div>
       </div>
       <div class="midi-keyboard" id="midi-keyboard" role="group" aria-label="On-screen keyboard"></div>
-      <div class="midi-actions">
-        <button class="btn btn--sm" id="midi-clear">Clear</button>
+      <div class="midi-controls">
+        <label class="midi-control-label">Waveform:
+          <select id="midi-waveform" class="select">
+            <option value="sine">Sine</option>
+            <option value="triangle">Triangle</option>
+            <option value="sawtooth">Sawtooth</option>
+            <option value="square">Square</option>
+          </select>
+        </label>
+        <button class="btn btn--sm" id="midi-commit">Commit Word</button>
+        <button class="btn btn--sm" id="midi-clear">Clear All</button>
       </div>
     </section>
   `;
@@ -30,6 +39,8 @@ export function renderMidiLab(container) {
   const translationEl = container.querySelector('#midi-translation');
   const keyboardEl = container.querySelector('#midi-keyboard');
   const clearBtn = container.querySelector('#midi-clear');
+  const commitBtn = container.querySelector('#midi-commit');
+  const waveformSelect = container.querySelector('#midi-waveform');
 
   let currentSyllables = [];
   let completedWords = [];
@@ -49,21 +60,20 @@ export function renderMidiLab(container) {
   const midi = new MidiInput();
   midi.init();
 
-  document.addEventListener('midi:status', (e) => {
+  // Named handlers for proper cleanup
+  const onMidiStatus = (e) => {
     const { connected, message } = e.detail;
     statusEl.textContent = message;
     statusEl.className = `midi-status ${connected ? 'connected' : 'disconnected'}`;
-  });
+  };
+  const onMidiNote = (e) => onNote(e.detail.syllable);
+  const onMidiSilence = () => {
+    if (currentSyllables.length > 0) commitWord();
+  };
 
-  document.addEventListener('midi:note', (e) => {
-    onNote(e.detail.syllable);
-  });
-
-  document.addEventListener('midi:silence', () => {
-    if (currentSyllables.length > 0) {
-      commitWord();
-    }
-  });
+  document.addEventListener('midi:status', onMidiStatus);
+  document.addEventListener('midi:note', onMidiNote);
+  document.addEventListener('midi:silence', onMidiSilence);
 
   clearBtn.addEventListener('click', () => {
     currentSyllables = [];
@@ -74,8 +84,10 @@ export function renderMidiLab(container) {
     translationEl.textContent = '';
   });
 
+  commitBtn.addEventListener('click', () => commitWord());
+
   function onNote(syllable) {
-    playNote(syllable);
+    playNote(syllable, { waveform: waveformSelect.value });
     currentSyllables.push(syllable);
     renderCurrent();
 
@@ -138,10 +150,22 @@ export function renderMidiLab(container) {
     translationEl.textContent = sentence ? `Translation: ${sentence}` : '';
   }
 
+  // Keyboard shortcut: keys 1-7 to play notes
+  const onKeyDown = (e) => {
+    const n = Number(e.key);
+    if (n >= 1 && n <= 7) {
+      e.preventDefault();
+      onNote(NOTES[n - 1]);
+    }
+  };
+  document.addEventListener('keydown', onKeyDown);
+
   // Cleanup on view change
   return () => {
     midi.destroy();
-    document.removeEventListener('midi:note', onNote);
-    document.removeEventListener('midi:silence', commitWord);
+    document.removeEventListener('midi:status', onMidiStatus);
+    document.removeEventListener('midi:note', onMidiNote);
+    document.removeEventListener('midi:silence', onMidiSilence);
+    document.removeEventListener('keydown', onKeyDown);
   };
 }

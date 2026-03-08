@@ -1,7 +1,7 @@
 import { parseWord, translate, reverseTranslate } from '../utils/solresol.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
-import { playWord } from '../audio/synth.js';
+import { playWord, playSentence } from '../audio/synth.js';
 
 export function renderTranslator(container) {
   container.innerHTML = `
@@ -11,6 +11,7 @@ export function renderTranslator(container) {
         <div class="translator-direction">
           <button class="btn btn--active" data-dir="en-sol">English → Solresol</button>
           <button class="btn" data-dir="sol-en">Solresol → English</button>
+          <button class="btn" data-dir="sentence">Sentence</button>
         </div>
         <div class="translator-input-row">
           <input type="text" id="translator-input" class="input"
@@ -31,6 +32,7 @@ export function renderTranslator(container) {
   const dirBtns = container.querySelectorAll('[data-dir]');
   let direction = 'en-sol';
   let lastSyllables = [];
+  let lastSentenceWords = [];
 
   dirBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -39,10 +41,14 @@ export function renderTranslator(container) {
       btn.classList.add('btn--active');
       input.placeholder = direction === 'en-sol'
         ? 'Type an English word...'
-        : 'Type a Solresol word (e.g. doredo)...';
+        : direction === 'sol-en'
+        ? 'Type a Solresol word (e.g. doredo)...'
+        : 'Type an English sentence...';
       input.value = '';
       results.innerHTML = '';
       playBtn.disabled = true;
+      lastSyllables = [];
+      lastSentenceWords = [];
     });
   });
 
@@ -53,85 +59,156 @@ export function renderTranslator(container) {
   });
 
   playBtn.addEventListener('click', () => {
-    if (lastSyllables.length) playWord(lastSyllables);
+    if (lastSentenceWords.length > 0) {
+      playSentence(lastSentenceWords);
+    } else if (lastSyllables.length) {
+      playWord(lastSyllables);
+    }
   });
 
   function doTranslate() {
     const q = input.value.trim();
     results.innerHTML = '';
     lastSyllables = [];
+    lastSentenceWords = [];
     playBtn.disabled = true;
 
     if (!q) return;
 
-    if (direction === 'en-sol') {
-      const matches = reverseTranslate(q);
-      if (matches.length === 0) {
-        results.innerHTML = '<p class="no-results">No matches found</p>';
-        return;
-      }
-
-      const list = document.createElement('div');
-      list.className = 'result-list';
-
-      matches.slice(0, 30).forEach(entry => {
-        const item = document.createElement('div');
-        item.className = 'result-item';
-
-        const syllables = parseWord(entry.solresol);
-        const header = document.createElement('div');
-        header.className = 'result-header';
-
-        const wordEl = document.createElement('span');
-        wordEl.className = 'result-word';
-        wordEl.textContent = entry.solresol;
-
-        const defEl = document.createElement('span');
-        defEl.className = 'result-def';
-        defEl.textContent = entry.definition;
-
-        const playItemBtn = document.createElement('button');
-        playItemBtn.className = 'btn btn--sm btn--icon';
-        playItemBtn.innerHTML = '&#9654;';
-        playItemBtn.setAttribute('aria-label', `Play ${entry.solresol}`);
-        playItemBtn.addEventListener('click', () => playWord(syllables));
-
-        header.append(wordEl, playItemBtn);
-        item.append(header, createWordBlocks(syllables, { size: 'sm' }), defEl);
-        list.appendChild(item);
-      });
-
-      if (matches.length > 30) {
-        const more = document.createElement('p');
-        more.className = 'more-results';
-        more.textContent = `...and ${matches.length - 30} more results`;
-        list.appendChild(more);
-      }
-
-      results.appendChild(list);
+    if (direction === 'sentence') {
+      doSentence(q);
+    } else if (direction === 'en-sol') {
+      doEnglishToSolresol(q);
     } else {
-      const syllables = parseWord(q);
-      if (syllables.length === 0) {
-        results.innerHTML = '<p class="no-results">Enter a valid Solresol word</p>';
-        return;
+      doSolresolToEnglish(q);
+    }
+  }
+
+  function doEnglishToSolresol(q) {
+    const matches = reverseTranslate(q);
+    if (matches.length === 0) {
+      results.innerHTML = '<p class="no-results">No matches found</p>';
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'result-list';
+
+    matches.slice(0, 30).forEach(entry => {
+      const item = document.createElement('div');
+      item.className = 'result-item';
+
+      const syllables = parseWord(entry.solresol);
+      const header = document.createElement('div');
+      header.className = 'result-header';
+
+      const wordEl = document.createElement('span');
+      wordEl.className = 'result-word';
+      wordEl.textContent = entry.solresol;
+
+      const defEl = document.createElement('span');
+      defEl.className = 'result-def';
+      defEl.textContent = entry.definition;
+
+      const playItemBtn = document.createElement('button');
+      playItemBtn.className = 'btn btn--sm btn--icon';
+      playItemBtn.innerHTML = '&#9654;';
+      playItemBtn.setAttribute('aria-label', `Play ${entry.solresol}`);
+      playItemBtn.addEventListener('click', () => playWord(syllables));
+
+      header.append(wordEl, playItemBtn);
+      item.append(header, createWordBlocks(syllables, { size: 'sm' }), defEl);
+      list.appendChild(item);
+    });
+
+    if (matches.length > 30) {
+      const more = document.createElement('p');
+      more.className = 'more-results';
+      more.textContent = `...and ${matches.length - 30} more results`;
+      list.appendChild(more);
+    }
+
+    results.appendChild(list);
+  }
+
+  function doSolresolToEnglish(q) {
+    const syllables = parseWord(q);
+    if (syllables.length === 0) {
+      results.innerHTML = '<p class="no-results">Enter a valid Solresol word</p>';
+      return;
+    }
+
+    const def = translate(q);
+    lastSyllables = syllables;
+    playBtn.disabled = false;
+
+    const card = document.createElement('div');
+    card.className = 'result-card';
+
+    const title = document.createElement('h3');
+    title.textContent = syllables.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+
+    const defEl = document.createElement('p');
+    defEl.className = 'result-def';
+    defEl.textContent = def || 'Not found in dictionary';
+
+    card.append(title, createWordBlocks(syllables), defEl, createSheetMusic(syllables));
+    results.appendChild(card);
+  }
+
+  function doSentence(q) {
+    const words = q.split(/\s+/).filter(Boolean);
+    const sentenceEl = document.createElement('div');
+    sentenceEl.className = 'sentence-results';
+    const allSyllables = [];
+
+    for (const word of words) {
+      const matches = reverseTranslate(word);
+      const row = document.createElement('div');
+      row.className = 'sentence-word-row';
+
+      const engLabel = document.createElement('span');
+      engLabel.className = 'sentence-eng';
+      engLabel.textContent = word;
+
+      const arrow = document.createElement('span');
+      arrow.className = 'sentence-arrow';
+      arrow.textContent = '→';
+
+      row.append(engLabel, arrow);
+
+      if (matches.length > 0) {
+        const best = matches[0];
+        const syls = parseWord(best.solresol);
+        allSyllables.push(syls);
+
+        const solLabel = document.createElement('span');
+        solLabel.className = 'sentence-sol';
+        solLabel.textContent = best.solresol;
+
+        row.append(createWordBlocks(syls, { size: 'sm' }), solLabel);
+      } else {
+        const missing = document.createElement('span');
+        missing.className = 'sentence-missing';
+        missing.textContent = '(not found)';
+        row.appendChild(missing);
       }
 
-      const def = translate(q);
-      lastSyllables = syllables;
+      sentenceEl.appendChild(row);
+    }
+
+    // Sheet music for full sentence
+    const flatSyllables = allSyllables.flat();
+    if (flatSyllables.length > 0) {
+      lastSentenceWords = allSyllables;
       playBtn.disabled = false;
 
-      const card = document.createElement('div');
-      card.className = 'result-card';
-
-      const title = document.createElement('h3');
-      title.textContent = syllables.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
-
-      const defEl = document.createElement('p');
-      defEl.className = 'result-def';
-      defEl.textContent = def || 'Not found in dictionary';
-
-      card.append(title, createWordBlocks(syllables), defEl, createSheetMusic(syllables));
-      results.appendChild(card);
+      const sheet = document.createElement('div');
+      sheet.className = 'sentence-sheet';
+      sheet.appendChild(createSheetMusic(flatSyllables));
+      sentenceEl.appendChild(sheet);
     }
+
+    results.appendChild(sentenceEl);
   }
 }

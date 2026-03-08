@@ -64,8 +64,35 @@
 .result-card .note-blocks { justify-content: center; margin-bottom: 0.75rem; }
 .result-card svg { margin-top: 1rem; }
 
-.no-results { color: var(--text-dim); text-align: center; }
+.no-results { color: var(--text-dim); text-align: center; padding: 1rem 0; }
 .more-results { color: var(--text-dim); text-align: center; font-size: 0.85rem; margin-top: 0.5rem; }
+
+/* === Sentence Mode === */
+.sentence-results { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.sentence-word-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+
+.sentence-eng { font-weight: 600; min-width: 80px; }
+.sentence-arrow { color: var(--text-dim); }
+.sentence-sol { color: var(--accent); font-weight: 500; }
+.sentence-missing { color: var(--text-dim); font-style: italic; font-size: 0.85rem; }
+
+.sentence-sheet {
+  margin-top: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
 
 /* === Dictionary === */
 .dictionary-controls {
@@ -109,6 +136,26 @@
 
 .dict-word { font-weight: 600; font-size: 0.95rem; }
 .dict-def { color: var(--text-dim); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dict-row:hover { background: var(--border); }
+
+.dict-detail {
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin: 2px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dict-detail-def {
+  color: var(--text);
+  font-size: 0.95rem;
+  text-align: center;
+  max-width: 500px;
+}
 
 .dict-pager {
   display: flex;

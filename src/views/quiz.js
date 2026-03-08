@@ -3,6 +3,15 @@ import { getColor, translate, parseWord, getAllEntries } from '../utils/solresol
 import { createWordBlocks } from '../components/color-block.js';
 import { playNote, playWord } from '../audio/synth.js';
 
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export function renderQuiz(container) {
   container.innerHTML = `
     <section class="view quiz-view">
@@ -27,7 +36,8 @@ export function renderQuiz(container) {
   let mode = 'note';
   let score = 0;
   let streak = 0;
-  let cleanup = null;
+  let roundCleanup = null;
+  let roundTimer = null;
 
   modeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -54,12 +64,16 @@ export function renderQuiz(container) {
   }
 
   function startRound() {
-    if (cleanup) cleanup();
-    cleanup = null;
+    if (roundCleanup) { roundCleanup(); roundCleanup = null; }
+    clearTimeout(roundTimer);
 
     if (mode === 'note') noteRound();
     else if (mode === 'word') wordRound();
     else translateRound();
+  }
+
+  function nextRound(delay) {
+    roundTimer = setTimeout(startRound, delay);
   }
 
   // --- Note Recognition ---
@@ -67,6 +81,7 @@ export function renderQuiz(container) {
     const target = pickRandom(NOTES);
     area.innerHTML = `
       <p class="quiz-prompt">Listen and identify the note:</p>
+      <p class="quiz-hint">Press keys 1–7 or click a button</p>
       <button class="btn btn--lg" id="quiz-play-note">&#9654; Play</button>
       <div class="quiz-options" id="quiz-options"></div>
       <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
@@ -99,32 +114,48 @@ export function renderQuiz(container) {
         : `Wrong — it was ${target.charAt(0).toUpperCase() + target.slice(1)}`;
       feedback.className = `quiz-feedback ${correct ? 'correct' : 'wrong'}`;
 
-      // Highlight correct answer
       optionsEl.querySelectorAll('.note-btn').forEach(b => {
         if (b.textContent.toLowerCase() === target) b.classList.add('btn--correct');
         b.disabled = true;
       });
 
-      setTimeout(startRound, 1500);
+      nextRound(1500);
     }
 
-    // Auto-play on start
+    // Keyboard input: 1-7
+    const onKeyDown = (e) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= 7) {
+        e.preventDefault();
+        handleAnswer(NOTES[n - 1]);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    roundCleanup = () => document.removeEventListener('keydown', onKeyDown);
+
     setTimeout(() => playNote(target, { duration: 0.8 }), 300);
   }
 
   // --- Word Building ---
   function wordRound() {
     const entries = getAllEntries().filter(e => e.syllables >= 2 && e.syllables <= 4 && e.definition);
+    if (entries.length === 0) {
+      area.innerHTML = '<p class="no-results">No entries available for this mode</p>';
+      return;
+    }
     const entry = pickRandom(entries);
     const syllables = parseWord(entry.solresol);
 
     area.innerHTML = `
       <p class="quiz-prompt">Listen and build the word:</p>
+      <p class="quiz-hint">Press keys 1–7 to add notes, Enter to submit</p>
       <button class="btn btn--lg" id="quiz-play-word">&#9654; Play</button>
       <div class="quiz-built" id="quiz-built"></div>
       <div class="quiz-options" id="quiz-options"></div>
-      <button class="btn btn--sm" id="quiz-clear">Clear</button>
-      <button class="btn btn--sm" id="quiz-submit">Submit</button>
+      <div class="quiz-actions">
+        <button class="btn btn--sm" id="quiz-clear">Clear</button>
+        <button class="btn btn--sm" id="quiz-submit">Submit</button>
+      </div>
       <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
     `;
 
@@ -145,16 +176,18 @@ export function renderQuiz(container) {
       btn.className = 'btn note-btn';
       btn.style.borderBottomColor = getColor(note);
       btn.textContent = note.charAt(0).toUpperCase() + note.slice(1);
-      btn.addEventListener('click', () => {
-        if (answered) return;
-        built.push(note);
-        builtEl.innerHTML = '';
-        builtEl.appendChild(createWordBlocks(built, { size: 'sm' }));
-      });
+      btn.addEventListener('click', () => addNote(note));
       optionsEl.appendChild(btn);
     }
 
-    area.querySelector('#quiz-submit').addEventListener('click', () => {
+    function addNote(note) {
+      if (answered) return;
+      built.push(note);
+      builtEl.innerHTML = '';
+      builtEl.appendChild(createWordBlocks(built, { size: 'sm' }));
+    }
+
+    function submit() {
       if (answered || built.length === 0) return;
       answered = true;
       const correct = built.length === syllables.length && built.every((s, i) => s === syllables[i]);
@@ -163,8 +196,28 @@ export function renderQuiz(container) {
         ? `Correct! "${entry.definition}"`
         : `Wrong — it was ${entry.solresol} (${entry.definition})`;
       feedback.className = `quiz-feedback ${correct ? 'correct' : 'wrong'}`;
-      setTimeout(startRound, 2000);
-    });
+      nextRound(2000);
+    }
+
+    area.querySelector('#quiz-submit').addEventListener('click', submit);
+
+    // Keyboard: 1-7 to add, Enter to submit, Backspace to clear
+    const onKeyDown = (e) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= 7) {
+        e.preventDefault();
+        addNote(NOTES[n - 1]);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        submit();
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        built = [];
+        builtEl.innerHTML = '';
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    roundCleanup = () => document.removeEventListener('keydown', onKeyDown);
 
     setTimeout(() => playWord(syllables), 300);
   }
@@ -172,14 +225,21 @@ export function renderQuiz(container) {
   // --- Translation Quiz ---
   function translateRound() {
     const entries = getAllEntries().filter(e => e.definition && e.syllables >= 2);
-    const correct = pickRandom(entries);
-    const wrongs = [];
-    while (wrongs.length < 3) {
-      const w = pickRandom(entries);
-      if (w !== correct && !wrongs.includes(w)) wrongs.push(w);
+    if (entries.length < 4) {
+      area.innerHTML = '<p class="no-results">Not enough entries for this mode</p>';
+      return;
     }
 
-    const options = [correct, ...wrongs].sort(() => Math.random() - 0.5);
+    const correct = pickRandom(entries);
+    const wrongs = [];
+    let safety = 0;
+    while (wrongs.length < 3 && safety < 100) {
+      const w = pickRandom(entries);
+      if (w !== correct && !wrongs.includes(w)) wrongs.push(w);
+      safety++;
+    }
+
+    const options = shuffle([correct, ...wrongs]);
 
     area.innerHTML = `
       <p class="quiz-prompt">Which Solresol word means:</p>
@@ -192,7 +252,7 @@ export function renderQuiz(container) {
     const feedback = area.querySelector('#quiz-feedback');
     let answered = false;
 
-    for (const opt of options) {
+    options.forEach((opt, idx) => {
       const btn = document.createElement('button');
       btn.className = 'btn quiz-choice';
       const syls = parseWord(opt.solresol);
@@ -200,37 +260,63 @@ export function renderQuiz(container) {
       const label = document.createElement('span');
       label.textContent = opt.solresol;
 
+      const numLabel = document.createElement('span');
+      numLabel.className = 'quiz-choice-num';
+      numLabel.textContent = idx + 1;
+
+      btn.appendChild(numLabel);
       btn.appendChild(label);
       btn.appendChild(createWordBlocks(syls, { size: 'sm', showLabel: false }));
 
-      btn.addEventListener('click', () => {
-        if (answered) return;
-        answered = true;
-        const isCorrect = opt === correct;
-        updateScore(isCorrect);
-
-        if (isCorrect) {
-          btn.classList.add('btn--correct');
-          feedback.textContent = 'Correct!';
-          feedback.className = 'quiz-feedback correct';
-          playWord(syls);
-        } else {
-          btn.classList.add('btn--wrong');
-          feedback.textContent = `Wrong — it was ${correct.solresol}`;
-          feedback.className = 'quiz-feedback wrong';
-          optionsEl.querySelectorAll('.quiz-choice').forEach(b => {
-            if (b.querySelector('span').textContent === correct.solresol) {
-              b.classList.add('btn--correct');
-            }
-          });
-        }
-
-        setTimeout(startRound, 2000);
-      });
-
+      btn.addEventListener('click', () => handleChoice(opt, btn, syls));
       optionsEl.appendChild(btn);
+    });
+
+    function handleChoice(opt, btn, syls) {
+      if (answered) return;
+      answered = true;
+      const isCorrect = opt === correct;
+      updateScore(isCorrect);
+
+      if (isCorrect) {
+        btn.classList.add('btn--correct');
+        feedback.textContent = 'Correct!';
+        feedback.className = 'quiz-feedback correct';
+        playWord(syls);
+      } else {
+        btn.classList.add('btn--wrong');
+        feedback.textContent = `Wrong — it was ${correct.solresol}`;
+        feedback.className = 'quiz-feedback wrong';
+        optionsEl.querySelectorAll('.quiz-choice').forEach(b => {
+          if (b.querySelector('span:nth-child(2)').textContent === correct.solresol) {
+            b.classList.add('btn--correct');
+          }
+        });
+      }
+
+      nextRound(2000);
     }
+
+    // Keyboard: 1-4 to select option
+    const onKeyDown = (e) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= options.length) {
+        e.preventDefault();
+        const opt = options[n - 1];
+        const btn = optionsEl.querySelectorAll('.quiz-choice')[n - 1];
+        const syls = parseWord(opt.solresol);
+        handleChoice(opt, btn, syls);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    roundCleanup = () => document.removeEventListener('keydown', onKeyDown);
   }
 
   startRound();
+
+  // View-level cleanup
+  return () => {
+    if (roundCleanup) roundCleanup();
+    clearTimeout(roundTimer);
+  };
 }
