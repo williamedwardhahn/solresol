@@ -1,0 +1,150 @@
+/* === Note Blocks === */
+.note-blocks {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.note-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.note-block--sm { width: 28px; height: 28px; font-size: 0.6rem; }
+.note-block--md { width: 44px; height: 44px; font-size: 0.8rem; }
+.note-block--lg { width: 60px; height: 60px; font-size: 1rem; }
+
+/* === MIDI Keyboard === */
+.midi-keyboard {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.midi-key {
+  width: 64px;
+  height: 64px;
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.midi-key:hover { transform: scale(1.08); }
+.midi-key:active { transform: scale(0.95); }
+
+/* === Quiz === */
+.quiz-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.note-btn {
+  border-bottom-width: 3px;
+  border-bottom-style: solid;
+  min-width: 70px;
+}
+
+.quiz-choice {
+  flex-direction: column;
+  padding: 0.6rem 1rem;
+  gap: 0.4rem;
+  min-width: 120px;
+}
+
+.quiz-feedback {
+  font-weight: 600;
+  font-size: 1.1rem;
+  min-height: 1.5em;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.quiz-feedback.correct { color: #4ade80; }
+.quiz-feedback.wrong { color: #f87171; }
+
+.quiz-prompt {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.quiz-target-word {
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+
+.quiz-score {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  color: var(--text-dim);
+}
+
+.quiz-built {
+  min-height: 40px;
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+/* === MIDI Lab === */
+.midi-status {
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.midi-status.connected { background: rgba(74,222,128,0.15); color: #4ade80; }
+.midi-status.disconnected { background: rgba(248,113,113,0.15); color: #f87171; }
+
+.midi-current { min-height: 50px; margin-bottom: 1rem; }
+.midi-label { color: var(--text-dim); margin-right: 0.5rem; }
+
+.midi-word-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.midi-word-text { color: var(--text-dim); font-size: 0.9rem; }
+
+.midi-sheet {
+  margin: 1rem 0;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.midi-sheet:empty { display: none; }
+
+.midi-translation {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.midi-actions {
+  margin-top: 1rem;
+  text-align: center;
+}
