@@ -157,6 +157,11 @@
   max-width: 500px;
 }
 
+.dict-detail-meta {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
 .dict-pager {
   display: flex;
   align-items: center;

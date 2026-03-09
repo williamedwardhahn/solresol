@@ -1,6 +1,9 @@
 import { getAllEntries, parseWord, translate } from '../utils/solresol.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
+import { createNotationDisplay, createNotationToggles } from '../components/notation-display.js';
+import { getAntonym } from '../utils/antonyms.js';
+import { getSemanticCategory } from '../utils/grammar.js';
 import { playWord } from '../audio/synth.js';
 import { getHashParams } from '../app.js';
 
@@ -168,6 +171,8 @@ export function renderDictionary(container) {
     if (match) showDetail(match, listEl.querySelector('.dict-row'));
   }
 
+  let activeNotations = new Set(['solfege', 'colors', 'numbers', 'binary', 'braille']);
+
   function showDetail(entry, rowEl) {
     // Toggle: close if already open
     const existing = rowEl.nextElementSibling;
@@ -184,20 +189,48 @@ export function renderDictionary(container) {
     detail.className = 'dict-detail';
 
     const blocks = createWordBlocks(syllables, { size: 'md' });
-    const blocksNum = createWordBlocks(syllables, { size: 'md', showNumber: true });
 
     const defEl = document.createElement('p');
     defEl.className = 'dict-detail-def';
     defEl.textContent = entry.definition || 'No definition available';
+
+    // Semantic category (only meaningful for 2+ syllable words)
+    const category = syllables.length >= 2 ? getSemanticCategory(entry.solresol) : null;
+    if (category) {
+      const catEl = document.createElement('div');
+      catEl.className = 'dict-detail-meta';
+      catEl.textContent = category.label;
+      detail.appendChild(catEl);
+    }
+
+    // Antonym
+    const antonym = getAntonym(entry.solresol);
+    if (antonym) {
+      const antEl = document.createElement('div');
+      antEl.className = 'dict-detail-meta';
+      const antDef = translate(antonym);
+      antEl.textContent = `Antonym: ${antonym}${antDef ? ' — ' + antDef : ''}`;
+      detail.appendChild(antEl);
+    }
 
     const playDetailBtn = document.createElement('button');
     playDetailBtn.className = 'btn btn--sm';
     playDetailBtn.innerHTML = '&#9654; Play';
     playDetailBtn.addEventListener('click', () => playWord(syllables));
 
+    // Notation display with toggles
+    const notationEl = createNotationDisplay(entry.solresol, activeNotations);
+    const toggles = createNotationToggles(activeNotations, (updated) => {
+      activeNotations = updated;
+      // Re-render notation
+      const newNotation = createNotationDisplay(entry.solresol, activeNotations);
+      const oldNotation = detail.querySelector('.notation-display');
+      if (oldNotation) oldNotation.replaceWith(newNotation);
+    });
+
     const sheet = createSheetMusic(syllables);
 
-    detail.append(blocks, blocksNum, defEl, playDetailBtn, sheet);
+    detail.append(blocks, defEl, playDetailBtn, toggles, notationEl, sheet);
     rowEl.after(detail);
   }
 }

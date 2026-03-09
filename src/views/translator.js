@@ -1,6 +1,7 @@
 import { parseWord, translate, reverseTranslate } from '../utils/solresol.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
+import { createNotationDisplay } from '../components/notation-display.js';
 import { playWord, playSentence } from '../audio/synth.js';
 
 export function renderTranslator(container) {
@@ -152,7 +153,8 @@ export function renderTranslator(container) {
     defEl.className = 'result-def';
     defEl.textContent = def || 'Not found in dictionary';
 
-    card.append(title, createWordBlocks(syllables), defEl, createSheetMusic(syllables));
+    const notation = createNotationDisplay(q, new Set(['solfege', 'colors', 'numbers', 'binary']));
+    card.append(title, createWordBlocks(syllables), defEl, notation, createSheetMusic(syllables));
     results.appendChild(card);
   }
 
