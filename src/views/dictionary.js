@@ -1,7 +1,8 @@
 import { getAllEntries, parseWord, translate } from '../utils/solresol.js';
 import { createWordBlocks } from '../components/color-block.js';
-import { createSheetMusic } from '../components/sheet-music.js';
-import { createNotationDisplay, createNotationToggles } from '../components/notation-display.js';
+import { SolresolWord } from '../models/word.js';
+import { createWordRenderer } from '../components/word-renderer.js';
+import { createNotationToggles } from '../components/notation-display.js';
 import { getAntonym } from '../utils/antonyms.js';
 import { getSemanticCategory } from '../utils/grammar.js';
 import { playWord } from '../audio/synth.js';
@@ -57,6 +58,9 @@ export function renderDictionary(container) {
   const pagerEl = container.querySelector('#dict-pager');
   let page = 0;
   let filtered = allEntries;
+  let activeDetailRenderer = null;
+
+  let activeNotations = new Set(['solfege', 'colors', 'numbers', 'binary', 'braille']);
 
   function applyFilters() {
     const q = searchInput.value.trim().toLowerCase();
@@ -85,6 +89,7 @@ export function renderDictionary(container) {
 
     countEl.textContent = `${filtered.length} entries`;
     listEl.innerHTML = '';
+    if (activeDetailRenderer) { activeDetailRenderer.destroy(); activeDetailRenderer = null; }
 
     if (filtered.length === 0) {
       listEl.innerHTML = '<p class="no-results">No matching entries</p>';
@@ -116,9 +121,8 @@ export function renderDictionary(container) {
       playBtn.setAttribute('aria-label', `Play ${entry.solresol}`);
       playBtn.addEventListener('click', () => playWord(syllables));
 
-      row.style.cursor = 'pointer';
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.btn')) return; // don't trigger on play button
+        if (e.target.closest('.btn')) return;
         showDetail(entry, row);
       });
 
@@ -157,7 +161,7 @@ export function renderDictionary(container) {
   syllableSelect.addEventListener('change', applyFilters);
   startSelect.addEventListener('change', applyFilters);
 
-  // Deep-link support: #dictionary?word=dofami
+  // Deep-link support
   const params = getHashParams();
   if (params.word) {
     searchInput.value = params.word;
@@ -165,36 +169,45 @@ export function renderDictionary(container) {
 
   applyFilters();
 
-  // If deep-linked, auto-expand the first match
   if (params.word && filtered.length > 0) {
     const match = filtered.find(e => e.solresol.toLowerCase() === params.word.toLowerCase());
     if (match) showDetail(match, listEl.querySelector('.dict-row'));
   }
-
-  let activeNotations = new Set(['solfege', 'colors', 'numbers', 'binary', 'braille']);
 
   function showDetail(entry, rowEl) {
     // Toggle: close if already open
     const existing = rowEl.nextElementSibling;
     if (existing && existing.classList.contains('dict-detail')) {
       existing.remove();
+      if (activeDetailRenderer) { activeDetailRenderer.destroy(); activeDetailRenderer = null; }
       return;
     }
 
     // Close any other open detail
     container.querySelectorAll('.dict-detail').forEach(d => d.remove());
+    if (activeDetailRenderer) { activeDetailRenderer.destroy(); activeDetailRenderer = null; }
 
-    const syllables = parseWord(entry.solresol);
+    const word = new SolresolWord(entry.solresol);
     const detail = document.createElement('div');
     detail.className = 'dict-detail';
 
-    const blocks = createWordBlocks(syllables, { size: 'md' });
+    // Unified WordRenderer with all notations and reverse button
+    const wr = createWordRenderer(word, {
+      size: 'md',
+      showSheet: true,
+      showDefinition: true,
+      showReverse: true,
+      reactive: true,
+      notations: activeNotations,
+      onReverse: (w) => {
+        // When reversed, update the detail to show the new word's info
+        w.set([...w.syllables].reverse());
+      },
+    });
+    activeDetailRenderer = wr;
 
-    const defEl = document.createElement('p');
-    defEl.className = 'dict-detail-def';
-    defEl.textContent = entry.definition || 'No definition available';
-
-    // Semantic category (only meaningful for 2+ syllable words)
+    // Semantic category
+    const syllables = parseWord(entry.solresol);
     const category = syllables.length >= 2 ? getSemanticCategory(entry.solresol) : null;
     if (category) {
       const catEl = document.createElement('div');
@@ -203,34 +216,29 @@ export function renderDictionary(container) {
       detail.appendChild(catEl);
     }
 
-    // Antonym
+    // Antonym info
     const antonym = getAntonym(entry.solresol);
     if (antonym) {
       const antEl = document.createElement('div');
       antEl.className = 'dict-detail-meta';
       const antDef = translate(antonym);
       antEl.textContent = `Antonym: ${antonym}${antDef ? ' — ' + antDef : ''}`;
+      antEl.style.cursor = 'pointer';
+      antEl.title = 'Click to search';
+      antEl.addEventListener('click', () => {
+        searchInput.value = antonym;
+        applyFilters();
+      });
       detail.appendChild(antEl);
     }
 
-    const playDetailBtn = document.createElement('button');
-    playDetailBtn.className = 'btn btn--sm';
-    playDetailBtn.innerHTML = '&#9654; Play';
-    playDetailBtn.addEventListener('click', () => playWord(syllables));
-
-    // Notation display with toggles
-    const notationEl = createNotationDisplay(entry.solresol, activeNotations);
+    // Notation toggles
     const toggles = createNotationToggles(activeNotations, (updated) => {
       activeNotations = updated;
-      // Re-render notation
-      const newNotation = createNotationDisplay(entry.solresol, activeNotations);
-      const oldNotation = detail.querySelector('.notation-display');
-      if (oldNotation) oldNotation.replaceWith(newNotation);
+      wr.rerender();
     });
 
-    const sheet = createSheetMusic(syllables);
-
-    detail.append(blocks, defEl, playDetailBtn, toggles, notationEl, sheet);
+    detail.append(wr.el, toggles);
     rowEl.after(detail);
   }
 }

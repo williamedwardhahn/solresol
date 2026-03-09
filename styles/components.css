@@ -11,9 +11,25 @@
   align-items: center;
   justify-content: center;
   border-radius: 4px;
+  border: none;
   color: #fff;
   font-weight: 600;
   text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+
+button.note-block {
+  cursor: pointer;
+  padding: 0;
+}
+
+button.note-block:hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 8px rgba(255,255,255,0.15);
+}
+
+button.note-block:active {
+  transform: scale(0.93);
 }
 
 .note-block--sm { width: 28px; height: 28px; font-size: 0.6rem; }

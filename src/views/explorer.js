@@ -67,27 +67,38 @@ export function renderExplorer(container) {
     // Render basic words first
     const basic = families.get('_basic');
     if (basic) {
-      const section = createFamilySection('Basic Words', basic);
+      const section = createFamilySection('Basic Words', basic, [note]);
       familiesEl.appendChild(section);
       families.delete('_basic');
     }
 
     // Then semantic families
     for (const [key, members] of families) {
+      const prefixSyls = parseWord(key);
       const familyName = key.charAt(0).toUpperCase() + key.slice(1) + '- family';
-      const section = createFamilySection(familyName, members);
+      const section = createFamilySection(familyName, members, prefixSyls);
       familiesEl.appendChild(section);
     }
   }
 
-  function createFamilySection(title, entries) {
+  function createFamilySection(title, entries, prefixSyls) {
     const section = document.createElement('div');
     section.className = 'explorer-family';
 
     const header = document.createElement('h3');
     header.className = 'explorer-family-title';
-    header.textContent = `${title} (${entries.length})`;
     header.style.cursor = 'pointer';
+
+    // Show colored blocks for the family prefix
+    if (prefixSyls && prefixSyls.length > 0) {
+      const blocks = createWordBlocks(prefixSyls, { size: 'sm', showLabel: true, playable: true });
+      blocks.style.display = 'inline-flex';
+      blocks.style.marginRight = '0.5rem';
+      blocks.style.verticalAlign = 'middle';
+      header.appendChild(blocks);
+    }
+    const titleText = document.createTextNode(`${title} (${entries.length})`);
+    header.appendChild(titleText);
 
     const list = document.createElement('div');
     list.className = 'explorer-family-list';

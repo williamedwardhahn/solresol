@@ -1,7 +1,10 @@
 import { NOTES } from '../utils/constants.js';
-import { getColor, getFrequency } from '../utils/solresol.js';
+import { getColor, getFrequency, parseWord } from '../utils/solresol.js';
+import { SolresolWord } from '../models/word.js';
+import { createWordRenderer } from '../components/word-renderer.js';
 import { createWordBlocks } from '../components/color-block.js';
-import { playNote } from '../audio/synth.js';
+import { playNote, playWord } from '../audio/synth.js';
+import { getSyllableNotations } from '../utils/notation.js';
 
 export function renderReference(container) {
   container.innerHTML = `
@@ -22,7 +25,16 @@ export function renderReference(container) {
 
       <article class="ref-section">
         <h3>The Seven Notes</h3>
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.5rem">Click any note to hear it:</p>
         <div id="ref-notes" class="ref-notes-grid"></div>
+      </article>
+
+      <article class="ref-section">
+        <h3>Communication Modes — Live Demo</h3>
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.5rem">Type a Solresol word to see it in all modes simultaneously:</p>
+        <input type="text" id="ref-modes-input" class="input" style="max-width:300px;margin-bottom:0.75rem"
+               placeholder="e.g. fala, misol, doredo..." autocomplete="off">
+        <div id="ref-modes-demo"></div>
       </article>
 
       <article class="ref-section">
@@ -39,43 +51,26 @@ export function renderReference(container) {
         <h4>Stress &amp; Parts of Speech</h4>
         <p>The <strong>stress position</strong> on a word changes its grammatical role:</p>
         <ul>
-          <li>Stress on <strong>no syllable</strong> (default) &rarr; Noun</li>
+          <li>No stress (default) &rarr; <strong>Noun</strong></li>
           <li>Stress on <strong>last syllable</strong> &rarr; Adjective</li>
           <li>Stress on <strong>penultimate syllable</strong> &rarr; Verb</li>
           <li>Stress on <strong>antepenultimate syllable</strong> &rarr; Adverb</li>
         </ul>
 
-        <h4>Antonyms by Reversal</h4>
-        <p>A key Solresol principle: <strong>reversing</strong> a word produces its
-        opposite meaning. For example:</p>
-        <div id="ref-antonym-example"></div>
+        <h4>Antonyms by Reversal — Try It</h4>
+        <p>Reversing a word produces its opposite meaning. Click ⇄ to flip:</p>
+        <div id="ref-antonym-demo" style="display:flex;justify-content:center;margin:0.75rem 0"></div>
 
         <h4>Gender</h4>
         <p>Feminine forms are indicated by adding an accent or lengthening the final syllable.</p>
 
         <h4>Tense</h4>
         <ul>
-          <li>Past tense &mdash; prefix with <strong>Re</strong></li>
-          <li>Future tense &mdash; prefix with <strong>Fa</strong></li>
-          <li>Conditional &mdash; prefix with <strong>La</strong></li>
+          <li>Past tense &mdash; prefix with <strong>Dodo</strong></li>
+          <li>Future tense &mdash; prefix with <strong>Mimi</strong></li>
+          <li>Conditional &mdash; prefix with <strong>Fafa</strong></li>
+          <li>Imperative &mdash; prefix with <strong>Solsol</strong></li>
         </ul>
-      </article>
-
-      <article class="ref-section">
-        <h3>Communication Modes</h3>
-        <table class="ref-table">
-          <thead>
-            <tr><th>Mode</th><th>How</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Speech</td><td>Pronounce the solfege syllables</td></tr>
-            <tr><td>Music</td><td>Play the corresponding notes on any instrument</td></tr>
-            <tr><td>Color</td><td>Use the 7-color code shown above</td></tr>
-            <tr><td>Numbers</td><td>1=Do, 2=Re, 3=Mi, 4=Fa, 5=Sol, 6=La, 7=Si</td></tr>
-            <tr><td>Hand Signs</td><td>Point to fingers 1&ndash;7</td></tr>
-            <tr><td>Flags</td><td>7 colored flags in sequence</td></tr>
-          </tbody>
-        </table>
       </article>
 
       <article class="ref-section">
@@ -90,7 +85,7 @@ export function renderReference(container) {
     </section>
   `;
 
-  // Render interactive notes grid
+  // --- Interactive notes grid ---
   const notesGrid = container.querySelector('#ref-notes');
   for (const note of NOTES) {
     const card = document.createElement('div');
@@ -99,13 +94,15 @@ export function renderReference(container) {
 
     const num = NOTES.indexOf(note) + 1;
     const freq = getFrequency(note).toFixed(1);
+    const notData = getSyllableNotations(note);
 
     card.innerHTML = `
       <div class="ref-note-name" style="color: ${getColor(note)}">
         ${note.charAt(0).toUpperCase() + note.slice(1)}
       </div>
       <div class="ref-note-detail">Number: ${num}</div>
-      <div class="ref-note-detail">Frequency: ${freq} Hz</div>
+      <div class="ref-note-detail">${freq} Hz</div>
+      <div class="ref-note-detail" style="font-family:monospace">${notData.binary} | ${notData.braille} | ${notData.ascii}</div>
     `;
 
     card.style.cursor = 'pointer';
@@ -122,25 +119,53 @@ export function renderReference(container) {
     notesGrid.appendChild(card);
   }
 
-  // Antonym example: fala (good) ↔ lafa (bad)
-  const antonymEl = container.querySelector('#ref-antonym-example');
-  const row = document.createElement('div');
-  row.className = 'ref-antonym-row';
+  // --- Live communication modes demo ---
+  const modesInput = container.querySelector('#ref-modes-input');
+  const modesDemo = container.querySelector('#ref-modes-demo');
+  let modesRenderer = null;
 
-  const left = document.createElement('div');
-  left.className = 'ref-antonym-item';
-  left.innerHTML = '<strong>Fala</strong> = good';
-  left.appendChild(createWordBlocks(['fa', 'la'], { size: 'sm' }));
+  function updateModes() {
+    modesDemo.innerHTML = '';
+    if (modesRenderer) { modesRenderer.destroy(); modesRenderer = null; }
 
-  const arrow = document.createElement('span');
-  arrow.className = 'ref-antonym-arrow';
-  arrow.textContent = '↔';
+    const q = modesInput.value.trim();
+    if (!q) return;
 
-  const right = document.createElement('div');
-  right.className = 'ref-antonym-item';
-  right.innerHTML = '<strong>Lafa</strong> = bad';
-  right.appendChild(createWordBlocks(['la', 'fa'], { size: 'sm' }));
+    const syls = parseWord(q);
+    if (syls.length === 0) return;
 
-  row.append(left, arrow, right);
-  antonymEl.appendChild(row);
+    const word = new SolresolWord(syls);
+    modesRenderer = createWordRenderer(word, {
+      size: 'lg',
+      showSheet: true,
+      showDefinition: true,
+      showReverse: word.length >= 2,
+      reactive: true,
+      notations: new Set(['colors', 'solfege', 'numbers', 'binary', 'braille', 'ascii', 'sauso']),
+    });
+    modesDemo.appendChild(modesRenderer.el);
+  }
+
+  let modesDebounce;
+  modesInput.addEventListener('input', () => {
+    clearTimeout(modesDebounce);
+    modesDebounce = setTimeout(updateModes, 150);
+  });
+
+  // Pre-fill with "fala"
+  modesInput.value = 'fala';
+  updateModes();
+
+  // --- Antonym reversal demo ---
+  const antonymDemo = container.querySelector('#ref-antonym-demo');
+  const antWord = new SolresolWord(['fa', 'la']);
+  const antRenderer = createWordRenderer(antWord, {
+    size: 'lg',
+    showSheet: true,
+    showDefinition: true,
+    showReverse: true,
+    reactive: true,
+    notations: new Set(['colors', 'solfege', 'numbers']),
+  });
+  antonymDemo.appendChild(antRenderer.el);
 }

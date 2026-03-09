@@ -43,7 +43,7 @@ export function createSheetMusic(syllables, opts = {}) {
     line.setAttribute('x2', String(width - 20));
     line.setAttribute('y1', String(y));
     line.setAttribute('y2', String(y));
-    line.setAttribute('stroke', '#333');
+    line.setAttribute('stroke', '#555');
     line.setAttribute('stroke-width', '1');
     svg.appendChild(line);
   }
@@ -53,7 +53,7 @@ export function createSheetMusic(syllables, opts = {}) {
   clef.setAttribute('x', '25');
   clef.setAttribute('y', String(STAFF_Y + 32));
   clef.setAttribute('font-size', '42');
-  clef.setAttribute('fill', '#333');
+  clef.setAttribute('fill', '#555');
   clef.textContent = '\u{1D11E}'; // 𝄞
   svg.appendChild(clef);
 
@@ -70,7 +70,7 @@ export function createSheetMusic(syllables, opts = {}) {
       ledger.setAttribute('x2', String(x + 12));
       ledger.setAttribute('y1', String(STAFF_Y + 5 * LINE_GAP));
       ledger.setAttribute('y2', String(STAFF_Y + 5 * LINE_GAP));
-      ledger.setAttribute('stroke', '#333');
+      ledger.setAttribute('stroke', '#555');
       ledger.setAttribute('stroke-width', '1');
       svg.appendChild(ledger);
     }
@@ -82,7 +82,7 @@ export function createSheetMusic(syllables, opts = {}) {
     note.setAttribute('rx', String(NOTE_RADIUS_X));
     note.setAttribute('ry', String(NOTE_RADIUS_Y));
     note.setAttribute('fill', getColor(syl));
-    note.setAttribute('stroke', '#333');
+    note.setAttribute('stroke', '#555');
     note.setAttribute('stroke-width', '0.5');
     svg.appendChild(note);
 
@@ -92,7 +92,7 @@ export function createSheetMusic(syllables, opts = {}) {
     stem.setAttribute('x2', String(x + NOTE_RADIUS_X));
     stem.setAttribute('y1', String(y));
     stem.setAttribute('y2', String(y - 30));
-    stem.setAttribute('stroke', '#333');
+    stem.setAttribute('stroke', '#777');
     stem.setAttribute('stroke-width', '1.5');
     svg.appendChild(stem);
 

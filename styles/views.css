@@ -132,11 +132,16 @@
   padding: 0.5rem 0.75rem;
   background: var(--bg-card);
   border-radius: 4px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
 }
 
 .dict-word { font-weight: 600; font-size: 0.95rem; }
 .dict-def { color: var(--text-dim); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dict-row:hover { background: var(--border); }
+.dict-row:hover {
+  background: var(--border);
+  border-left-color: var(--accent);
+}
 
 .dict-detail {
   background: var(--bg-card);
@@ -189,6 +194,7 @@
   border-radius: var(--radius);
   padding: 1.5rem;
   min-height: 200px;
+  transition: opacity 0.15s ease;
 }
 
 /* === MIDI Lab === */
@@ -212,8 +218,8 @@
 
 .ref-notes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
   margin-top: 0.5rem;
 }
 
@@ -222,14 +228,14 @@
   border: 1px solid var(--border);
   border-left-width: 4px;
   border-radius: var(--radius);
-  padding: 0.75rem;
+  padding: 0.5rem 0.6rem;
   cursor: pointer;
   transition: transform 0.1s;
 }
 
-.ref-note-card:hover { transform: scale(1.03); }
-.ref-note-name { font-size: 1.1rem; font-weight: 700; }
-.ref-note-detail { font-size: 0.8rem; color: var(--text-dim); }
+.ref-note-card:hover { transform: scale(1.04); }
+.ref-note-name { font-size: 1rem; font-weight: 700; }
+.ref-note-detail { font-size: 0.7rem; color: var(--text-dim); line-height: 1.4; }
 
 .ref-table {
   width: 100%;
@@ -316,6 +322,30 @@
 .explorer-def { color: var(--text-dim); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* === Antonyms === */
+.antonym-explorer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.antonym-explorer-input { margin-bottom: 0.75rem; }
+
+.antonym-live-pair {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+
+.antonym-live-hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .antonym-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .antonym-row {
@@ -339,7 +369,28 @@
 
 .antonym-word { font-weight: 700; font-size: 1.05rem; }
 .antonym-def { color: var(--text-dim); font-size: 0.82rem; }
-.antonym-arrow { font-size: 1.5rem; color: var(--text-dim); flex-shrink: 0; }
+
+.antonym-arrow {
+  font-size: 1.5rem;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.antonym-arrow--interactive {
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-dim);
+  transition: color 0.15s, transform 0.15s;
+  padding: 0.25rem;
+  border-radius: var(--radius);
+}
+
+.antonym-arrow--interactive:hover {
+  color: var(--accent);
+  transform: scale(1.2);
+}
 
 /* === Numbers === */
 .numbers-converter {
@@ -448,6 +499,163 @@
   margin-bottom: 0.75rem;
 }
 
+/* === Composer === */
+.composer-view { max-width: 800px; }
+
+.composer-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.composer-slot {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  transition: border-color 0.2s;
+}
+
+.composer-slot--filled {
+  border-color: var(--accent);
+}
+
+.composer-slot-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.1rem;
+}
+
+.composer-slot-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+
+.composer-slot-input {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.composer-slot-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.composer-slot-results:not(:empty) {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  background: var(--bg);
+  margin-top: 2px;
+}
+
+.composer-result-item {
+  text-align: left;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer-slot-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.composer-modifiers {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.composer-mod-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.composer-output {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  min-height: 100px;
+  text-align: center;
+}
+
+.composer-output-empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  padding: 1rem;
+}
+
+.composer-sentence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.composer-word-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.composer-word-role {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.composer-word-role--marker {
+  color: var(--accent);
+}
+
+.composer-sheet {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.composer-text {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.composer-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
 /* === Responsive === */
 @media (max-width: 640px) {
   .dict-row {
@@ -463,13 +671,12 @@
 
   .midi-key { width: 48px; height: 48px; font-size: 0.75rem; }
 
-  .ref-notes-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+  .ref-notes-grid { grid-template-columns: repeat(4, 1fr); }
 
   .explorer-entry { grid-template-columns: 90px auto 1fr 32px; font-size: 0.82rem; }
   .explorer-cat-btn { min-width: 80px; }
 
   .antonym-row { flex-direction: column; }
-  .antonym-arrow { transform: rotate(90deg); }
 
   .num-row { grid-template-columns: 70px auto 1fr 32px; }
 

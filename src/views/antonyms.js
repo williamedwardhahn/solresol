@@ -1,59 +1,152 @@
-import { getAntonymPairs } from '../utils/antonyms.js';
+import { getAntonymPairs, getAntonym } from '../utils/antonyms.js';
+import { SolresolWord } from '../models/word.js';
+import { createWordRenderer } from '../components/word-renderer.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { playWord } from '../audio/synth.js';
+import { parseWord, translate } from '../utils/solresol.js';
 
+/**
+ * Antonym pairs view — interactive reversal visualizer.
+ * Drag, click, or type any word to see its reversal and meaning flip.
+ */
 export function renderAntonyms(container) {
   container.innerHTML = `
     <section class="view antonyms-view">
       <h2>Antonym Pairs</h2>
-      <p class="view-desc">A unique Solresol principle: <strong>reversing</strong> a word's syllables produces its opposite meaning.</p>
+      <p class="view-desc">Reversing a word's syllables creates its opposite meaning. Try it yourself:</p>
+
+      <div class="antonym-explorer">
+        <div class="antonym-explorer-input">
+          <input type="text" id="antonym-input" class="input"
+                 placeholder="Type any Solresol word (e.g. fala, misol)..." autocomplete="off"
+                 aria-label="Enter a Solresol word to reverse">
+        </div>
+        <div id="antonym-live" class="antonym-live"></div>
+      </div>
+
+      <h3 style="margin-top:1.5rem">Known Antonym Pairs</h3>
       <div id="antonym-list" class="antonym-list"></div>
     </section>
   `;
 
+  const inputEl = container.querySelector('#antonym-input');
+  const liveEl = container.querySelector('#antonym-live');
   const listEl = container.querySelector('#antonym-list');
+  const renderers = [];
+
+  // Live any-word reversal tool
+  let debounce;
+  inputEl.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => renderLiveReversal(), 150);
+  });
+
+  function renderLiveReversal() {
+    liveEl.innerHTML = '';
+    const q = inputEl.value.trim();
+    if (!q) return;
+
+    const syls = parseWord(q);
+    if (syls.length < 2) {
+      liveEl.innerHTML = '<p class="antonym-live-hint">Enter at least 2 syllables to see reversal</p>';
+      return;
+    }
+
+    const original = new SolresolWord(syls);
+    const reversed = original.reversed();
+
+    const pairEl = document.createElement('div');
+    pairEl.className = 'antonym-live-pair';
+
+    // Original
+    const origSide = createReversibleSide(original, reversed);
+    // Arrow
+    const arrow = document.createElement('div');
+    arrow.className = 'antonym-arrow antonym-arrow--interactive';
+    arrow.textContent = '⇄';
+    arrow.title = 'Click to hear both';
+    arrow.addEventListener('click', () => {
+      playWord(original.syllables);
+      setTimeout(() => playWord(reversed.syllables), original.length * 400 + 300);
+    });
+    // Reversed
+    const revSide = createReversibleSide(reversed, original);
+
+    pairEl.append(origSide, arrow, revSide);
+    liveEl.appendChild(pairEl);
+  }
+
+  function createReversibleSide(word, other) {
+    const side = document.createElement('div');
+    side.className = 'antonym-side';
+
+    const wr = createWordRenderer(word, {
+      size: 'md',
+      showSheet: false,
+      showDefinition: true,
+      showReverse: false,
+      reactive: false,
+      notations: new Set(['colors']),
+    });
+    renderers.push(wr);
+    side.appendChild(wr.el);
+
+    if (!word.exists) {
+      const hint = document.createElement('div');
+      hint.className = 'antonym-def';
+      hint.textContent = '(not in dictionary)';
+      side.appendChild(hint);
+    }
+
+    return side;
+  }
+
+  // Known pairs with interactive reversal animation
   const pairs = getAntonymPairs();
 
   for (const pair of pairs) {
     const row = document.createElement('div');
     row.className = 'antonym-row';
 
-    // Left word
+    const w1 = new SolresolWord(pair.syllables1);
+    const w2 = new SolresolWord(pair.syllables2);
+
+    // Left side
     const left = document.createElement('div');
     left.className = 'antonym-side';
-    const leftWord = document.createElement('div');
-    leftWord.className = 'antonym-word';
-    leftWord.textContent = pair.word1;
-    const leftBlocks = createWordBlocks(pair.syllables1, { size: 'sm' });
-    const leftDef = document.createElement('div');
-    leftDef.className = 'antonym-def';
-    leftDef.textContent = pair.def1;
-    const leftPlay = document.createElement('button');
-    leftPlay.className = 'btn btn--sm btn--icon';
-    leftPlay.innerHTML = '&#9654;';
-    leftPlay.addEventListener('click', () => playWord(pair.syllables1));
-    left.append(leftWord, leftBlocks, leftDef, leftPlay);
+    const leftWr = createWordRenderer(w1, {
+      size: 'sm',
+      showSheet: false,
+      showDefinition: true,
+      reactive: false,
+      notations: new Set(['colors']),
+    });
+    renderers.push(leftWr);
+    left.appendChild(leftWr.el);
 
-    // Arrow
-    const arrow = document.createElement('div');
-    arrow.className = 'antonym-arrow';
-    arrow.textContent = '↔';
+    // Reverse button as the arrow
+    const arrow = document.createElement('button');
+    arrow.className = 'antonym-arrow antonym-arrow--interactive';
+    arrow.textContent = '⇄';
+    arrow.title = 'Play both words';
+    arrow.setAttribute('aria-label', `Play ${pair.word1} and ${pair.word2}`);
+    arrow.addEventListener('click', () => {
+      playWord(pair.syllables1);
+      setTimeout(() => playWord(pair.syllables2), pair.syllables1.length * 400 + 300);
+    });
 
-    // Right word
+    // Right side
     const right = document.createElement('div');
     right.className = 'antonym-side';
-    const rightWord = document.createElement('div');
-    rightWord.className = 'antonym-word';
-    rightWord.textContent = pair.word2;
-    const rightBlocks = createWordBlocks(pair.syllables2, { size: 'sm' });
-    const rightDef = document.createElement('div');
-    rightDef.className = 'antonym-def';
-    rightDef.textContent = pair.def2;
-    const rightPlay = document.createElement('button');
-    rightPlay.className = 'btn btn--sm btn--icon';
-    rightPlay.innerHTML = '&#9654;';
-    rightPlay.addEventListener('click', () => playWord(pair.syllables2));
-    right.append(rightWord, rightBlocks, rightDef, rightPlay);
+    const rightWr = createWordRenderer(w2, {
+      size: 'sm',
+      showSheet: false,
+      showDefinition: true,
+      reactive: false,
+      notations: new Set(['colors']),
+    });
+    renderers.push(rightWr);
+    right.appendChild(rightWr.el);
 
     row.append(left, arrow, right);
     listEl.appendChild(row);

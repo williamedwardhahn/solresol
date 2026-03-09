@@ -1,7 +1,8 @@
 import { parseWord, translate, reverseTranslate } from '../utils/solresol.js';
+import { SolresolWord } from '../models/word.js';
+import { createWordRenderer } from '../components/word-renderer.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
-import { createNotationDisplay } from '../components/notation-display.js';
 import { playWord, playSentence } from '../audio/synth.js';
 
 export function renderTranslator(container) {
@@ -34,6 +35,7 @@ export function renderTranslator(container) {
   let direction = 'en-sol';
   let lastSyllables = [];
   let lastSentenceWords = [];
+  const renderers = [];
 
   dirBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -73,6 +75,8 @@ export function renderTranslator(container) {
     lastSyllables = [];
     lastSentenceWords = [];
     playBtn.disabled = true;
+    for (const r of renderers) r.destroy();
+    renderers.length = 0;
 
     if (!q) return;
 
@@ -96,29 +100,20 @@ export function renderTranslator(container) {
     list.className = 'result-list';
 
     matches.slice(0, 30).forEach(entry => {
+      const word = new SolresolWord(entry.solresol);
       const item = document.createElement('div');
       item.className = 'result-item';
 
-      const syllables = parseWord(entry.solresol);
-      const header = document.createElement('div');
-      header.className = 'result-header';
-
-      const wordEl = document.createElement('span');
-      wordEl.className = 'result-word';
-      wordEl.textContent = entry.solresol;
-
-      const defEl = document.createElement('span');
-      defEl.className = 'result-def';
-      defEl.textContent = entry.definition;
-
-      const playItemBtn = document.createElement('button');
-      playItemBtn.className = 'btn btn--sm btn--icon';
-      playItemBtn.innerHTML = '&#9654;';
-      playItemBtn.setAttribute('aria-label', `Play ${entry.solresol}`);
-      playItemBtn.addEventListener('click', () => playWord(syllables));
-
-      header.append(wordEl, playItemBtn);
-      item.append(header, createWordBlocks(syllables, { size: 'sm' }), defEl);
+      const wr = createWordRenderer(word, {
+        size: 'sm',
+        showSheet: false,
+        showDefinition: true,
+        showReverse: word.length >= 2,
+        reactive: true,
+        notations: new Set(['colors', 'solfege']),
+      });
+      renderers.push(wr);
+      item.appendChild(wr.el);
       list.appendChild(item);
     });
 
@@ -139,22 +134,23 @@ export function renderTranslator(container) {
       return;
     }
 
-    const def = translate(q);
     lastSyllables = syllables;
     playBtn.disabled = false;
 
+    const word = new SolresolWord(syllables);
     const card = document.createElement('div');
     card.className = 'result-card';
 
-    const title = document.createElement('h3');
-    title.textContent = syllables.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
-
-    const defEl = document.createElement('p');
-    defEl.className = 'result-def';
-    defEl.textContent = def || 'Not found in dictionary';
-
-    const notation = createNotationDisplay(q, new Set(['solfege', 'colors', 'numbers', 'binary']));
-    card.append(title, createWordBlocks(syllables), defEl, notation, createSheetMusic(syllables));
+    const wr = createWordRenderer(word, {
+      size: 'lg',
+      showSheet: true,
+      showDefinition: true,
+      showReverse: word.length >= 2,
+      reactive: true,
+      notations: new Set(['colors', 'solfege', 'numbers', 'binary']),
+    });
+    renderers.push(wr);
+    card.appendChild(wr.el);
     results.appendChild(card);
   }
 
@@ -184,11 +180,11 @@ export function renderTranslator(container) {
         const syls = parseWord(best.solresol);
         allSyllables.push(syls);
 
+        row.appendChild(createWordBlocks(syls, { size: 'sm' }));
         const solLabel = document.createElement('span');
         solLabel.className = 'sentence-sol';
         solLabel.textContent = best.solresol;
-
-        row.append(createWordBlocks(syls, { size: 'sm' }), solLabel);
+        row.appendChild(solLabel);
       } else {
         const missing = document.createElement('span');
         missing.className = 'sentence-missing';
@@ -199,7 +195,6 @@ export function renderTranslator(container) {
       sentenceEl.appendChild(row);
     }
 
-    // Sheet music for full sentence
     const flatSyllables = allSyllables.flat();
     if (flatSyllables.length > 0) {
       lastSentenceWords = allSyllables;
