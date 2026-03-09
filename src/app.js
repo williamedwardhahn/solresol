@@ -3,13 +3,21 @@ import { renderDictionary } from './views/dictionary.js';
 import { renderQuiz } from './views/quiz.js';
 import { renderMidiLab } from './views/midi-lab.js';
 import { renderReference } from './views/reference.js';
+import { renderExplorer } from './views/explorer.js';
+import { renderAntonyms } from './views/antonyms.js';
+import { renderNumbers } from './views/numbers.js';
+import { renderPhrasebook } from './views/phrasebook.js';
 
 const routes = {
-  translator:  { label: 'Translator', render: renderTranslator },
-  dictionary:  { label: 'Dictionary', render: renderDictionary },
-  quiz:        { label: 'Quiz',       render: renderQuiz },
-  'midi-lab':  { label: 'MIDI Lab',   render: renderMidiLab },
-  reference:   { label: 'Reference',  render: renderReference },
+  translator:  { label: 'Translate',   render: renderTranslator },
+  dictionary:  { label: 'Dictionary',  render: renderDictionary },
+  explorer:    { label: 'Explorer',    render: renderExplorer },
+  numbers:     { label: 'Numbers',     render: renderNumbers },
+  phrasebook:  { label: 'Phrases',     render: renderPhrasebook },
+  antonyms:    { label: 'Antonyms',    render: renderAntonyms },
+  quiz:        { label: 'Quiz',        render: renderQuiz },
+  'midi-lab':  { label: 'MIDI Lab',    render: renderMidiLab },
+  reference:   { label: 'Reference',   render: renderReference },
 };
 
 const DEFAULT_ROUTE = 'translator';
