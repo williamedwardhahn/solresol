@@ -184,6 +184,10 @@ export function renderTranslate(container) {
     title.textContent = cat.label;
     section.appendChild(title);
 
+    const grid = document.createElement('div');
+    grid.className = 'phrase-grid';
+    section.appendChild(grid);
+
     for (const phrase of cat.phrases) {
       const row = document.createElement('div');
       row.className = 'phrase-row';
@@ -209,7 +213,7 @@ export function renderTranslate(container) {
         condensedEl.textContent = `Condensed: ${phrase.condensed}`;
         row.appendChild(condensedEl);
       }
-      section.appendChild(row);
+      grid.appendChild(row);
     }
     catsEl.appendChild(section);
   }

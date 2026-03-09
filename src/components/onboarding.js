@@ -23,9 +23,7 @@ export function renderOnboarding(container, onComplete) {
   container.innerHTML = `
     <section class="onboard">
       <div class="onboard-stage" id="onboard-stage"></div>
-      <div class="onboard-nav">
-        <button class="btn btn--sm onboard-skip" id="onboard-skip">Skip intro</button>
-      </div>
+      <button class="btn btn--sm onboard-skip" id="onboard-skip">Skip intro</button>
     </section>
   `;
 
