@@ -4,6 +4,8 @@ import { renderTranslate } from './views/translate.js';
 import { renderLearn } from './views/learn.js';
 import { initGlobalKeyboard } from './components/global-keyboard.js';
 import { initContextPanel } from './components/context-panel.js';
+import { initSentenceBar } from './components/sentence-bar.js';
+import { hasOnboarded, renderOnboarding } from './components/onboarding.js';
 
 const routes = {
   play:       { label: 'Play',       render: renderPlay },
@@ -71,6 +73,7 @@ export function initApp() {
   // Init persistent components
   initGlobalKeyboard(document.getElementById('global-keyboard'));
   initContextPanel(document.getElementById('context-panel'));
+  initSentenceBar(document.getElementById('sentence-bar'));
 
   // Build nav links
   for (const [route, config] of Object.entries(routes)) {
@@ -96,5 +99,21 @@ export function initApp() {
 
   // Route on hash change
   window.addEventListener('hashchange', () => navigate(getRoute()));
-  navigate(getRoute());
+
+  // Show onboarding on first visit
+  const initialRoute = getRoute();
+  if (initialRoute === 'play' && !hasOnboarded()) {
+    const content = document.getElementById('app-content');
+    content.innerHTML = '';
+    currentCleanup = renderOnboarding(content, () => {
+      currentCleanup = null;
+      navigate('play');
+    });
+    // Still update nav
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.classList.toggle('nav-link--active', link.dataset.route === 'play');
+    });
+  } else {
+    navigate(initialRoute);
+  }
 }

@@ -39,6 +39,7 @@ export function renderDictionary(container) {
   // Check hash params for initial mode
   const params = getHashParams();
   if (params.start) mode = 'category';
+  if (params.mode === 'sunburst') mode = 'sunburst';
 
   modeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -401,6 +402,10 @@ export function renderDictionary(container) {
     `;
     const sunburstEl = el.querySelector('#sunburst-container');
     sunburstInstance = createSunburst(sunburstEl);
+    // Auto-zoom if deep-linked
+    if (params.zoom && sunburstInstance.zoomTo) {
+      sunburstInstance.zoomTo(params.zoom);
+    }
   }
 
   // Cleanup debounce timers on navigation

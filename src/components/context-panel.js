@@ -90,18 +90,17 @@ function showWord(word) {
   // Create a copy so we don't mutate the focus word
   const displayWord = new SolresolWord(word.syllables);
 
-  // Word renderer with full notations
+  // Word renderer with full notations, mirror, and stress
   currentRenderer = createWordRenderer(displayWord, {
     size: 'lg',
     showSheet: true,
     showDefinition: true,
     showReverse: displayWord.length >= 2,
+    showMirror: true,
+    showStress: displayWord.length >= 2,
     reactive: true,
     notations: activeNotations,
     clickToFocus: false,
-    onReverse: (w) => {
-      w.set([...w.syllables].reverse());
-    },
   });
   content.appendChild(currentRenderer.el);
 
@@ -141,29 +140,76 @@ function showWord(word) {
 
   const dictBtn = document.createElement('button');
   dictBtn.className = 'btn btn--sm';
-  dictBtn.textContent = 'Find in Dictionary';
+  dictBtn.textContent = 'Dictionary';
+  dictBtn.title = 'Find in Dictionary';
   dictBtn.addEventListener('click', () => {
     window.location.hash = `dictionary?word=${displayWord.text.toLowerCase()}`;
     closePanel();
   });
   actions.appendChild(dictBtn);
 
+  // Sunburst deep link
+  if (displayWord.syllables.length > 0) {
+    const sunBtn = document.createElement('button');
+    sunBtn.className = 'btn btn--sm';
+    sunBtn.textContent = 'Sunburst';
+    sunBtn.title = 'Show on Sunburst';
+    sunBtn.addEventListener('click', () => {
+      window.location.hash = `dictionary?mode=sunburst&zoom=${displayWord.syllables[0]}`;
+      closePanel();
+    });
+    actions.appendChild(sunBtn);
+  }
+
   const shareBtn = document.createElement('button');
   shareBtn.className = 'btn btn--sm';
-  shareBtn.textContent = 'Share Card';
+  shareBtn.textContent = 'Share';
+  shareBtn.title = 'Share word card';
   shareBtn.addEventListener('click', async () => {
     shareBtn.disabled = true;
-    shareBtn.textContent = 'Generating...';
+    shareBtn.textContent = '...';
     const result = await shareWordCard(displayWord);
-    shareBtn.textContent = result === 'copied' ? 'Copied!' : 'Downloaded!';
+    shareBtn.textContent = result === 'copied' ? 'Copied!' : 'Saved!';
     setTimeout(() => {
-      shareBtn.textContent = 'Share Card';
+      shareBtn.textContent = 'Share';
       shareBtn.disabled = false;
     }, 2000);
   });
   actions.appendChild(shareBtn);
 
   content.appendChild(actions);
+
+  // Stress / Part of Speech toggles
+  if (displayWord.length >= 2) {
+    const stressEl = document.createElement('div');
+    stressEl.className = 'cp-meta';
+    stressEl.innerHTML = '<span class="cp-meta-label">Stress:</span> ';
+
+    const stressOpts = [
+      { value: null, label: 'None (noun)' },
+      { value: 'last', label: 'Last (adj.)' },
+      { value: 'penultimate', label: 'Penult. (verb)' },
+    ];
+    if (displayWord.length >= 3) {
+      stressOpts.push({ value: 'antepenultimate', label: 'Antepenult. (adv.)' });
+    }
+
+    for (const opt of stressOpts) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn--sm';
+      btn.style.marginLeft = '4px';
+      btn.textContent = opt.label;
+      if (displayWord.stressPosition === opt.value) btn.classList.add('btn--active');
+      btn.addEventListener('click', () => {
+        displayWord.stressPosition = opt.value;
+        // Update active state
+        stressEl.querySelectorAll('.btn').forEach(b => b.classList.remove('btn--active'));
+        btn.classList.add('btn--active');
+      });
+      stressEl.appendChild(btn);
+    }
+    content.appendChild(stressEl);
+  }
 
   // Notation toggles
   const toggles = createNotationToggles(activeNotations, (updated) => {

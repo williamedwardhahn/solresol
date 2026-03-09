@@ -2,6 +2,7 @@ import { NOTES } from '../utils/constants.js';
 import { getColor } from '../utils/solresol.js';
 import { SolresolWord } from '../models/word.js';
 import { createWordRenderer } from './word-renderer.js';
+import { createWordPredictor } from './word-predictor.js';
 import { playNote, playWord } from '../audio/synth.js';
 import { focusWord, commitFocusWord, setFocusWord } from '../state/focus-word.js';
 import { MidiInput } from '../audio/midi.js';
@@ -12,6 +13,7 @@ let captured = null; // quiz can capture keyboard input
 let keyboardEl = null;
 let buildEl = null;
 let wordRenderer = null;
+let wordPredictor = null;
 let collapsed = false;
 const keyEls = {};
 
@@ -197,24 +199,31 @@ function flashKey(note) {
 function renderBuilding() {
   buildEl.innerHTML = '';
 
+  if (wordRenderer) { wordRenderer.destroy(); wordRenderer = null; }
+  if (wordPredictor) { wordPredictor.destroy(); wordPredictor = null; }
+
   if (focusWord.isEmpty) {
-    const hint = document.createElement('span');
-    hint.className = 'gk-hint';
-    hint.textContent = 'Play notes...';
-    buildEl.appendChild(hint);
+    // Show predictor in empty state (hint text)
+    wordPredictor = createWordPredictor(focusWord);
+    buildEl.appendChild(wordPredictor.el);
     return;
   }
 
-  if (wordRenderer) wordRenderer.destroy();
+  // Color blocks for current word
   wordRenderer = createWordRenderer(focusWord, {
     size: 'sm',
     showSheet: false,
-    showDefinition: true,
+    showDefinition: false,
+    showMirror: false,
     reactive: false,
     notations: new Set(['colors']),
-    clickToFocus: false, // prevent recursive focus
+    clickToFocus: false,
   });
   buildEl.appendChild(wordRenderer.el);
+
+  // Meaning landscape predictor
+  wordPredictor = createWordPredictor(focusWord);
+  buildEl.appendChild(wordPredictor.el);
 }
 
 /** Quiz can capture keyboard input temporarily */

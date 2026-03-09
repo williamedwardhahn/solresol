@@ -130,6 +130,65 @@
   font-size: 0.75rem;
 }
 
+/* Stress indicator */
+.wr-block--stressed {
+  box-shadow: 0 0 0 2px #fff, 0 0 12px rgba(255,255,255,0.3);
+  transform: scale(1.08);
+}
+
+.wr-pos-badge {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-style: italic;
+  text-align: center;
+}
+
+/* Antonym mirror */
+.wr-mirror {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.2;
+  transition: opacity 0.3s;
+  cursor: pointer;
+  padding: 0.15rem 0;
+}
+
+.word-renderer:hover .wr-mirror {
+  opacity: 0.5;
+}
+
+.wr-mirror:hover {
+  opacity: 0.8 !important;
+}
+
+.wr-mirror-pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.wr-mirror-def {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.wr-mirror-arrow {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin: 0 2px;
+}
+
+/* Flip animation */
+.wr-row--colors.wr-flipping .wr-block {
+  transition: transform 0.4s ease-in-out;
+}
+
+.wr-def-fade {
+  transition: opacity 0.3s;
+}
+
 @media (max-width: 640px) {
   .wr-block--lg { width: 48px; height: 48px; font-size: 0.85rem; }
   .wr-block--md { width: 36px; height: 36px; font-size: 0.7rem; }

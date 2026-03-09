@@ -1,6 +1,7 @@
 import { SolresolWord } from '../models/word.js';
-import { getColor } from '../utils/solresol.js';
+import { getColor, translate } from '../utils/solresol.js';
 import { getSyllableNotations, NOTATION_SYSTEMS } from '../utils/notation.js';
+import { getAntonym } from '../utils/antonyms.js';
 import { playNote, playWord } from '../audio/synth.js';
 import { emit } from '../utils/events.js';
 import { setFocusWord } from '../state/focus-word.js';
@@ -8,7 +9,7 @@ import { setFocusWord } from '../state/focus-word.js';
 /**
  * Unified word display component.
  * Renders a SolresolWord as aligned columns of all active representations,
- * with cross-highlighting and click-to-play on every syllable.
+ * with cross-highlighting, click-to-play, antonym mirror, and stress visualization.
  */
 
 const DEFAULT_NOTATIONS = new Set(['colors', 'solfege', 'numbers']);
@@ -23,9 +24,12 @@ const DEFAULT_NOTATIONS = new Set(['colors', 'solfege', 'numbers']);
  * @param {boolean} opts.showSheet - show sheet music row (default true)
  * @param {boolean} opts.showDefinition - show definition (default false)
  * @param {boolean} opts.showReverse - show reverse button (default false)
+ * @param {boolean} opts.showMirror - show antonym mirror ghost (default: true for 2+ syl)
+ * @param {boolean} opts.showStress - show stress/POS controls (default false)
  * @param {boolean} opts.reactive - subscribe to word changes (default true)
+ * @param {boolean} opts.clickToFocus - click to open context panel (default true)
  * @param {function} opts.onReverse - callback when reverse button clicked
- * @returns {{ el: HTMLElement, destroy: function }}
+ * @returns {{ el: HTMLElement, destroy: function, rerender: function }}
  */
 export function createWordRenderer(word, opts = {}) {
   const {
@@ -35,6 +39,8 @@ export function createWordRenderer(word, opts = {}) {
     showSheet = true,
     showDefinition = false,
     showReverse = false,
+    showMirror = true,
+    showStress = false,
     reactive = true,
     clickToFocus = true,
     onReverse,
@@ -47,7 +53,6 @@ export function createWordRenderer(word, opts = {}) {
   if (clickToFocus) {
     el.classList.add('word-renderer--focusable');
     el.addEventListener('click', (e) => {
-      // Don't trigger if clicking a button (play, reverse, etc.)
       if (e.target.closest('button')) return;
       if (!word.isEmpty) {
         setFocusWord(word.syllables);
@@ -69,9 +74,14 @@ export function createWordRenderer(word, opts = {}) {
     // Definition
     if (showDefinition) {
       const defRow = document.createElement('div');
-      defRow.className = 'wr-definition';
-      if (word.exists) {
+      defRow.className = 'wr-definition wr-def-fade';
+      if (word.isDefined) {
         defRow.textContent = word.definition;
+      } else if (word.exists) {
+        // Word is structurally valid but not in dictionary
+        const cat = word.category;
+        defRow.textContent = word.text + (cat ? ` (${cat.label.split('—')[0].trim()} family)` : '');
+        defRow.classList.add('wr-definition--unknown');
       } else {
         defRow.textContent = word.text;
         defRow.classList.add('wr-definition--unknown');
@@ -98,7 +108,7 @@ export function createWordRenderer(word, opts = {}) {
 
     // Notation rows
     for (const sys of NOTATION_SYSTEMS) {
-      if (sys.key === 'colors') continue; // handled by color blocks
+      if (sys.key === 'colors') continue;
       if (!notations.has(sys.key)) continue;
       const row = document.createElement('div');
       row.className = `wr-row wr-row--${sys.key}`;
@@ -112,7 +122,7 @@ export function createWordRenderer(word, opts = {}) {
     // Sheet music row
     let sheetRow = null;
     if (showSheet) {
-      sheetRow = createMiniStaff(word.syllables);
+      sheetRow = createMiniStaff(word.syllables, word.stressIndex);
     }
 
     // Add spacer to color row for alignment with label columns
@@ -123,6 +133,8 @@ export function createWordRenderer(word, opts = {}) {
     }
 
     // Populate syllable columns
+    const stressIdx = word.stressIndex;
+
     word.syllables.forEach((syl, i) => {
       const notData = getSyllableNotations(syl);
       const color = getColor(syl);
@@ -130,6 +142,7 @@ export function createWordRenderer(word, opts = {}) {
       // Color block
       const block = document.createElement('button');
       block.className = `wr-block wr-block--${size}`;
+      if (stressIdx === i) block.classList.add('wr-block--stressed');
       block.style.backgroundColor = color;
       block.textContent = syl.charAt(0).toUpperCase() + syl.slice(1);
       block.dataset.sylIndex = i;
@@ -151,7 +164,7 @@ export function createWordRenderer(word, opts = {}) {
 
       // Notation values
       for (const item of rows) {
-        if (!item.key) continue; // skip colorRow
+        if (!item.key) continue;
         const cell = document.createElement('span');
         cell.className = 'wr-cell';
         cell.dataset.sylIndex = i;
@@ -186,6 +199,14 @@ export function createWordRenderer(word, opts = {}) {
 
     if (sheetRow) el.appendChild(sheetRow);
 
+    // Stress / Part of Speech badge
+    if (showStress && word.length >= 2) {
+      const posRow = document.createElement('div');
+      posRow.className = 'wr-pos-badge';
+      posRow.textContent = word.partOfSpeech;
+      el.appendChild(posRow);
+    }
+
     // Action bar
     const actions = document.createElement('div');
     actions.className = 'wr-actions';
@@ -206,22 +227,26 @@ export function createWordRenderer(word, opts = {}) {
     if (showReverse && word.length >= 2) {
       const revBtn = document.createElement('button');
       revBtn.className = 'btn btn--sm wr-reverse';
-      revBtn.textContent = '⇄ Reverse';
+      revBtn.textContent = '\u21C4 Reverse';
       revBtn.setAttribute('aria-label', 'Reverse syllables');
       revBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (onReverse) {
-          onReverse(word);
-        } else {
-          word.set([...word.syllables].reverse());
-        }
-        emit('word:reverse', { word });
+        animateFlip(el, word, onReverse);
       });
       actions.appendChild(revBtn);
     }
 
     if (actions.children.length > 0) {
       el.appendChild(actions);
+    }
+
+    // Antonym mirror ghost
+    if (showMirror && word.length >= 2) {
+      const antonymText = getAntonym(word.text);
+      if (antonymText) {
+        const mirror = createMirror(word, antonymText);
+        el.appendChild(mirror);
+      }
     }
   }
 
@@ -240,6 +265,87 @@ export function createWordRenderer(word, opts = {}) {
   };
 }
 
+/** Create the ghost antonym mirror */
+function createMirror(word, antonymText) {
+  const mirror = document.createElement('div');
+  mirror.className = 'wr-mirror';
+  mirror.title = `Antonym: ${antonymText}`;
+
+  const arrow = document.createElement('span');
+  arrow.className = 'wr-mirror-arrow';
+  arrow.textContent = '\u21C4';
+  mirror.appendChild(arrow);
+
+  // Reversed color pips
+  const revSyls = [...word.syllables].reverse();
+  for (const syl of revSyls) {
+    const pip = document.createElement('span');
+    pip.className = 'wr-mirror-pip';
+    pip.style.backgroundColor = getColor(syl);
+    mirror.appendChild(pip);
+  }
+
+  // Antonym definition
+  const antDef = translate(antonymText);
+  if (antDef) {
+    const def = document.createElement('span');
+    def.className = 'wr-mirror-def';
+    def.textContent = antDef;
+    mirror.appendChild(def);
+  }
+
+  // Click mirror to flip
+  mirror.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setFocusWord(antonymText);
+  });
+
+  return mirror;
+}
+
+/** Animate the flip/reverse of syllable blocks */
+function animateFlip(container, word, onReverse) {
+  const colorRow = container.querySelector('.wr-row--colors');
+  if (!colorRow) {
+    doReverse(word, onReverse);
+    return;
+  }
+
+  const blocks = [...colorRow.querySelectorAll('.wr-block')];
+  if (blocks.length < 2) {
+    doReverse(word, onReverse);
+    return;
+  }
+
+  // Calculate positions for the swap animation
+  const positions = blocks.map(b => b.getBoundingClientRect());
+
+  colorRow.classList.add('wr-flipping');
+
+  blocks.forEach((block, i) => {
+    const targetIdx = blocks.length - 1 - i;
+    const dx = positions[targetIdx].left - positions[i].left;
+    block.style.transform = `translateX(${dx}px)`;
+  });
+
+  // Play reversed audio
+  playWord([...word.syllables].reverse());
+
+  // After animation, do the actual reverse
+  setTimeout(() => {
+    doReverse(word, onReverse);
+    emit('word:reverse', { word });
+  }, 420);
+}
+
+function doReverse(word, onReverse) {
+  if (onReverse) {
+    onReverse(word);
+  } else {
+    word.reverse();
+  }
+}
+
 /** Highlight/unhighlight all elements in a syllable column */
 function highlightColumn(container, index, on) {
   const els = container.querySelectorAll(`[data-syl-index="${index}"]`);
@@ -249,7 +355,7 @@ function highlightColumn(container, index, on) {
 }
 
 /** Compact inline SVG mini-staff */
-function createMiniStaff(syllables) {
+function createMiniStaff(syllables, stressIndex) {
   const NOTE_POS = { do: 6, re: 5, mi: 4, fa: 3, sol: 2, la: 1, si: 0 };
   const staffY = 20;
   const lineGap = 6;
@@ -294,6 +400,7 @@ function createMiniStaff(syllables) {
     const pos = NOTE_POS[s] ?? 3;
     const y = staffY + pos * (lineGap / 2);
     const color = getColor(s);
+    const isStressed = stressIndex === i;
 
     // Ledger line for Do
     if (s === 'do') {
@@ -308,12 +415,26 @@ function createMiniStaff(syllables) {
       svg.appendChild(ledger);
     }
 
+    // Stress ring (drawn behind note)
+    if (isStressed) {
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ring.setAttribute('cx', String(x));
+      ring.setAttribute('cy', String(y));
+      ring.setAttribute('rx', String(rx + 3));
+      ring.setAttribute('ry', String(ry + 2));
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', '#fff');
+      ring.setAttribute('stroke-width', '1.5');
+      ring.setAttribute('opacity', '0.6');
+      svg.appendChild(ring);
+    }
+
     // Note head
     const note = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
     note.setAttribute('cx', String(x));
     note.setAttribute('cy', String(y));
-    note.setAttribute('rx', String(rx));
-    note.setAttribute('ry', String(ry));
+    note.setAttribute('rx', String(isStressed ? rx + 1 : rx));
+    note.setAttribute('ry', String(isStressed ? ry + 0.5 : ry));
     note.setAttribute('fill', color);
     note.setAttribute('data-syl-index', String(i));
     svg.appendChild(note);

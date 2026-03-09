@@ -36,6 +36,136 @@ button.note-block:active {
 .note-block--md { width: 44px; height: 44px; font-size: 0.8rem; }
 .note-block--lg { width: 60px; height: 60px; font-size: 1rem; }
 
+/* === Word Predictor === */
+.wp-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.wp-hint {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.wp-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.wp-cat {
+  font-weight: 600;
+}
+
+.wp-class {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  background: var(--bg);
+  border-radius: 3px;
+}
+
+.wp-def {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.wp-undef {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+.wp-dead-end {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.wp-matches {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.wp-match {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.wp-match:hover {
+  transform: scale(1.05);
+}
+
+.wp-fan {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  max-height: 72px;
+  overflow-y: auto;
+}
+
+.wp-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  font-size: 0.75rem;
+}
+
+.wp-branch:hover {
+  background: var(--bg-card);
+  border-color: var(--accent);
+}
+
+.wp-pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.wp-branch-name {
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.wp-branch-count {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+.wp-branch-preview {
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .wp-fan { max-height: 54px; }
+  .wp-branch-preview { display: none; }
+}
+
 /* === Quiz === */
 .quiz-hint {
   font-size: 0.8rem;
