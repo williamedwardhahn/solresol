@@ -33,7 +33,17 @@ export function renderOnboarding(container, onComplete) {
   skipBtn.addEventListener('click', finish);
 
   const steps = [
-    // Step 0: Hear this melody
+    // Step 0: Welcome — click unlocks AudioContext
+    () => {
+      stage.innerHTML = `
+        <h2 class="onboard-title">Welcome to Solresol</h2>
+        <p class="onboard-subtitle">A language made entirely of music</p>
+        <button class="btn btn--lg onboard-play-btn" id="onboard-begin">&#9654; Listen</button>
+      `;
+      stage.querySelector('#onboard-begin').addEventListener('click', nextStep);
+    },
+
+    // Step 1: Auto-play melody in sync with blocks (audio already unlocked)
     () => {
       stage.innerHTML = `
         <h2 class="onboard-title">Listen to this melody</h2>
@@ -44,12 +54,10 @@ export function renderOnboarding(container, onComplete) {
       const subEl = stage.querySelector('#onboard-sub');
       const word = ['do', 're', 'mi'];
 
-      // Play notes one by one with visual blocks appearing
       let i = 0;
       const interval = setInterval(() => {
         if (i >= word.length) {
           clearInterval(interval);
-          // Reveal it's a word
           setTimeout(() => {
             subEl.style.opacity = '1';
             subEl.style.transition = 'opacity 0.6s';

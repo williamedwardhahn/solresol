@@ -1104,6 +1104,12 @@ body:has(.sentence-bar:not(.sentence-bar--empty)) .content {
   margin-top: 1rem;
 }
 
+.onboard-play-btn {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  padding: 0.75rem 2rem;
+}
+
 .onboard-skip {
   color: var(--text-dim);
   margin-top: 0.75rem;
