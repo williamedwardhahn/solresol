@@ -7,7 +7,7 @@ import { focusWord, commitFocusWord, setFocusWord } from '../state/focus-word.js
 import { MidiInput } from '../audio/midi.js';
 import { on, emit } from '../utils/events.js';
 
-let waveform = 'sine';
+let waveform = (() => { try { return localStorage.getItem('solresol:waveform') || 'sine'; } catch { return 'sine'; } })();
 let captured = null; // quiz can capture keyboard input
 let keyboardEl = null;
 let buildEl = null;
@@ -37,6 +37,8 @@ export function initGlobalKeyboard(container) {
           <option value="sawtooth">⊿</option>
           <option value="square">□</option>
         </select>
+        <span class="gk-midi-status" id="gk-midi-status" title="MIDI status"></span>
+        <button class="btn btn--sm gk-help" id="gk-help" title="Keyboard shortcuts">?</button>
         <button class="btn btn--sm gk-toggle" id="gk-toggle" title="Toggle keyboard">▾</button>
       </div>
     </div>
@@ -71,19 +73,55 @@ export function initGlobalKeyboard(container) {
   // Controls
   commitBtn.addEventListener('click', () => commitFocusWord());
   undoBtn.addEventListener('click', () => focusWord.pop());
-  waveformSelect.addEventListener('change', () => { waveform = waveformSelect.value; });
+  waveformSelect.value = waveform;
+  waveformSelect.addEventListener('change', () => {
+    waveform = waveformSelect.value;
+    try { localStorage.setItem('solresol:waveform', waveform); } catch {}
+  });
   toggleBtn.addEventListener('click', () => {
     collapsed = !collapsed;
     container.classList.toggle('global-keyboard--collapsed', collapsed);
     toggleBtn.textContent = collapsed ? '▸' : '▾';
   });
 
+  // Help overlay
+  const helpBtn = container.querySelector('#gk-help');
+  helpBtn.addEventListener('click', () => {
+    const existing = document.querySelector('.gk-help-overlay');
+    if (existing) { existing.remove(); return; }
+    const overlay = document.createElement('div');
+    overlay.className = 'gk-help-overlay';
+    overlay.innerHTML = `
+      <div class="gk-help-card">
+        <h3>Keyboard Shortcuts</h3>
+        <table>
+          <tr><td><kbd>1</kbd>–<kbd>7</kbd></td><td>Play notes Do–Si</td></tr>
+          <tr><td><kbd>Q W E R T Y U</kbd></td><td>Play notes (alternate)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Commit word</td></tr>
+          <tr><td><kbd>Backspace</kbd></td><td>Undo last note</td></tr>
+          <tr><td><kbd>Escape</kbd></td><td>Clear / close panel</td></tr>
+        </table>
+        <button class="btn btn--sm" id="gk-help-close">Got it</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#gk-help-close').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  });
+
   // MIDI
+  const midiStatusEl = container.querySelector('#gk-midi-status');
   const midi = new MidiInput();
   midi.init();
   document.addEventListener('midi:note', (e) => onNote(e.detail.syllable));
   document.addEventListener('midi:silence', () => {
     if (!focusWord.isEmpty) commitFocusWord();
+  });
+  document.addEventListener('midi:status', (e) => {
+    const { connected, message } = e.detail;
+    midiStatusEl.textContent = connected ? '🎹' : '';
+    midiStatusEl.title = message;
+    midiStatusEl.classList.toggle('gk-midi--connected', connected);
   });
 
   // Global keyboard shortcuts

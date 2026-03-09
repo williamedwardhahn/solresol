@@ -35,6 +35,12 @@ body {
   min-height: 100vh;
 }
 
+@media (max-width: 640px) {
+  body.panel-open {
+    overflow: hidden;
+  }
+}
+
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -189,6 +195,57 @@ h4 { font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
   padding: 0.2rem 0.4rem;
 }
 
+.gk-midi-status {
+  font-size: 0.85rem;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.gk-midi--connected {
+  opacity: 1;
+}
+
+.gk-help {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 50%;
+  min-width: 0;
+}
+
+.gk-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gk-help-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 90%;
+}
+
+.gk-help-card h3 { margin-bottom: 0.75rem; }
+
+.gk-help-card table { width: 100%; margin-bottom: 1rem; }
+.gk-help-card td { padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.gk-help-card td:first-child { white-space: nowrap; }
+
+.gk-help-card kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
 /* === Context Panel === */
 .context-panel {
   position: fixed;
@@ -275,6 +332,22 @@ h4 { font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.cp-history {
+  margin-top: 0.5rem;
+}
+
+.cp-history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0.4rem;
+}
+
+.cp-history-chip {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
 }
 
 /* === App Body Layout === */

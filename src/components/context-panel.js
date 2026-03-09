@@ -9,7 +9,40 @@ import { on } from '../utils/events.js';
 
 let panelEl = null;
 let currentRenderer = null;
-let activeNotations = new Set(['colors', 'solfege', 'numbers', 'binary', 'braille', 'ascii', 'sauso']);
+const STORAGE_KEY = 'solresol:notations';
+const HISTORY_KEY = 'solresol:history';
+const MAX_HISTORY = 12;
+
+// Load saved notation prefs
+function loadNotations() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return new Set(JSON.parse(saved));
+  } catch {}
+  return new Set(['colors', 'solfege', 'numbers', 'binary', 'braille', 'ascii', 'sauso']);
+}
+
+function saveNotations(notations) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...notations])); } catch {}
+}
+
+let activeNotations = loadNotations();
+
+// Word history
+function getHistory() {
+  try {
+    const saved = localStorage.getItem(HISTORY_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return [];
+}
+
+function addToHistory(text) {
+  const history = getHistory().filter(w => w !== text);
+  history.unshift(text);
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
+}
 
 /**
  * Initialize the context panel — a slide-in drawer showing everything about the focus word.
@@ -109,9 +142,30 @@ function showWord(word) {
   // Notation toggles
   const toggles = createNotationToggles(activeNotations, (updated) => {
     activeNotations = updated;
+    saveNotations(activeNotations);
     if (currentRenderer) currentRenderer.rerender();
   });
   content.appendChild(toggles);
+
+  // Word history
+  addToHistory(displayWord.text);
+  const history = getHistory().filter(w => w !== displayWord.text);
+  if (history.length > 0) {
+    const histEl = document.createElement('div');
+    histEl.className = 'cp-history';
+    histEl.innerHTML = '<span class="cp-meta-label">Recent:</span>';
+    const list = document.createElement('div');
+    list.className = 'cp-history-list';
+    for (const w of history.slice(0, 8)) {
+      const chip = document.createElement('button');
+      chip.className = 'btn btn--sm cp-history-chip';
+      chip.textContent = w;
+      chip.addEventListener('click', () => setFocusWord(w));
+      list.appendChild(chip);
+    }
+    histEl.appendChild(list);
+    content.appendChild(histEl);
+  }
 
   openPanel();
 }

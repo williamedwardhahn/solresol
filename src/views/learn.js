@@ -64,6 +64,7 @@ export function renderLearn(container) {
   // =====================
   let quizInitialized = false;
   let quizKeyHandler = null;
+  let quizCleanup = null;
 
   function initQuiz() {
     quizInitialized = true;
@@ -73,13 +74,16 @@ export function renderLearn(container) {
     });
   }
 
-  // Cleanup
-  return () => {
+  // Cleanup — release keyboard and stop quiz timers
+  function cleanup() {
     releaseKeyboard();
     if (quizCleanup) quizCleanup();
-  };
+  }
 
-  var quizCleanup = null;
+  // Return cleanup function for router
+  // (called when navigating away from Learn view)
+  const _cleanup = () => cleanup();
+  // We need to return this at the end, store for now
 
   function renderStudy(el) {
     el.innerHTML = `
@@ -734,4 +738,6 @@ export function renderLearn(container) {
       clearTimeout(roundTimer);
     };
   }
+
+  return _cleanup;
 }

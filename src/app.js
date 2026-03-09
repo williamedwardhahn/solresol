@@ -18,7 +18,13 @@ let currentCleanup = null;
 function getRoute() {
   const hash = window.location.hash.slice(1);
   const [route] = hash.split('?');
-  return route || DEFAULT_ROUTE;
+  if (route && routes[route]) return route;
+  // Fall back to last visited route, then default
+  try {
+    const last = localStorage.getItem('solresol:route');
+    if (last && routes[last]) return last;
+  } catch {}
+  return DEFAULT_ROUTE;
 }
 
 /** Get query params from hash, e.g. #dictionary?word=dore → { word: 'dore' } */
@@ -53,6 +59,9 @@ function navigate(route) {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.toggle('nav-link--active', link.dataset.route === route);
   });
+
+  // Remember last route
+  try { localStorage.setItem('solresol:route', route); } catch {}
 }
 
 export function initApp() {

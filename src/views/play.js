@@ -4,7 +4,7 @@ import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
 import { playSentence } from '../audio/synth.js';
 import { focusWord, committedWords, commitFocusWord, clearSentence } from '../state/focus-word.js';
-import { buildSentence, TENSE_MARKERS, MODIFIERS } from '../utils/grammar.js';
+import { buildSentence, TENSE_MARKERS } from '../utils/grammar.js';
 import { searchDictionary, parseWord, translate } from '../utils/solresol.js';
 import { on } from '../utils/events.js';
 
@@ -248,9 +248,41 @@ export function renderPlay(container) {
         notations: new Set(['colors']),
       });
       card.appendChild(wr.el);
+
+      // Role label
+      const roleEl = document.createElement('div');
+      roleEl.className = 'composer-word-role';
+      for (const slot of SLOTS) {
+        if (slotValues[slot.key] === ws) { roleEl.textContent = slot.label; break; }
+      }
+      for (const [, marker] of Object.entries(TENSE_MARKERS)) {
+        if (marker.solresol === ws) {
+          roleEl.textContent = marker.label;
+          roleEl.classList.add('composer-word-role--marker');
+          break;
+        }
+      }
+      if (ws === 'Do' && parts.negate) {
+        roleEl.textContent = 'Negation';
+        roleEl.classList.add('composer-word-role--marker');
+      }
+      if (ws === 'Sol' && parts.question) {
+        roleEl.textContent = 'Question';
+        roleEl.classList.add('composer-word-role--marker');
+      }
+      card.appendChild(roleEl);
+
       row.appendChild(card);
     }
     outputEl.appendChild(row);
+
+    // Translation text
+    const textEl = document.createElement('div');
+    textEl.className = 'composer-text';
+    const solText = words.join(' ');
+    const engText = words.map(w => translate(w) || w).join(' ');
+    textEl.innerHTML = `<strong>${solText}</strong><br><span style="color:var(--text-dim)">${engText}</span>`;
+    outputEl.appendChild(textEl);
 
     const flat = allSyls.flat();
     if (flat.length > 0) {
