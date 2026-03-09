@@ -13,7 +13,7 @@
 <body>
   <header class="header">
     <div class="header-inner">
-      <a href="#instrument" class="logo">
+      <a href="#play" class="logo">
         <span class="logo-notes">
           <span style="color:#c40233">Do</span><span style="color:#e16b1a">Re</span><span style="color:#eac100">Mi</span><span style="color:#00a368">Fa</span><span style="color:#00b2b0">Sol</span><span style="color:#0088bf">La</span><span style="color:#624579">Si</span>
         </span>
@@ -23,7 +23,11 @@
       <nav class="nav" id="app-nav" role="navigation" aria-label="Main navigation"></nav>
     </div>
   </header>
-  <main id="app-content" class="content"></main>
+  <div id="global-keyboard" class="global-keyboard"></div>
+  <div class="app-body">
+    <main id="app-content" class="content"></main>
+    <aside id="context-panel" class="context-panel" aria-label="Word details"></aside>
+  </div>
   <script type="module">
     import { initApp } from './src/app.js';
     initApp();

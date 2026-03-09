@@ -262,6 +262,78 @@
 .ref-antonym-item { text-align: center; }
 .ref-antonym-arrow { font-size: 1.5rem; color: var(--text-dim); }
 
+/* === Play View === */
+.play-hero { margin-bottom: 1.5rem; }
+.play-hero p { color: var(--text-dim); font-size: 0.95rem; }
+
+.play-modes, .learn-modes, .dict-modes {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.play-sentence {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  min-height: 100px;
+}
+
+.play-empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.play-word-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.play-word-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+}
+
+.play-sheet {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.play-translation {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.play-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+/* === Learn View === */
+.learn-view .quiz-inner { text-align: center; }
+
+.quiz-options--col {
+  flex-direction: column;
+  max-width: 400px;
+  margin: 0.75rem auto;
+}
+
 /* === View description === */
 .view-desc { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 1.25rem; }
 

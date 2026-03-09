@@ -1,28 +1,18 @@
-import { renderInstrument } from './views/instrument.js';
-import { renderTranslator } from './views/translator.js';
+import { renderPlay } from './views/play.js';
 import { renderDictionary } from './views/dictionary.js';
-import { renderQuiz } from './views/quiz.js';
-import { renderReference } from './views/reference.js';
-import { renderExplorer } from './views/explorer.js';
-import { renderAntonyms } from './views/antonyms.js';
-import { renderNumbers } from './views/numbers.js';
-import { renderPhrasebook } from './views/phrasebook.js';
-import { renderComposer } from './views/composer.js';
+import { renderTranslate } from './views/translate.js';
+import { renderLearn } from './views/learn.js';
+import { initGlobalKeyboard } from './components/global-keyboard.js';
+import { initContextPanel } from './components/context-panel.js';
 
 const routes = {
-  instrument:  { label: 'Play',        render: renderInstrument },
-  composer:    { label: 'Compose',     render: renderComposer },
-  translator:  { label: 'Translate',   render: renderTranslator },
-  dictionary:  { label: 'Dictionary',  render: renderDictionary },
-  explorer:    { label: 'Explorer',    render: renderExplorer },
-  numbers:     { label: 'Numbers',     render: renderNumbers },
-  phrasebook:  { label: 'Phrases',     render: renderPhrasebook },
-  antonyms:    { label: 'Antonyms',    render: renderAntonyms },
-  quiz:        { label: 'Quiz',        render: renderQuiz },
-  reference:   { label: 'Reference',   render: renderReference },
+  play:       { label: 'Play',       render: renderPlay },
+  dictionary: { label: 'Dictionary', render: renderDictionary },
+  translate:  { label: 'Translate',  render: renderTranslate },
+  learn:      { label: 'Learn',      render: renderLearn },
 };
 
-const DEFAULT_ROUTE = 'instrument';
+const DEFAULT_ROUTE = 'play';
 let currentCleanup = null;
 
 function getRoute() {
@@ -69,6 +59,10 @@ export function initApp() {
   const nav = document.getElementById('app-nav');
   const toggle = document.getElementById('nav-toggle');
 
+  // Init persistent components
+  initGlobalKeyboard(document.getElementById('global-keyboard'));
+  initContextPanel(document.getElementById('context-panel'));
+
   // Build nav links
   for (const [route, config] of Object.entries(routes)) {
     const a = document.createElement('a');
@@ -79,7 +73,6 @@ export function initApp() {
     a.addEventListener('click', (e) => {
       e.preventDefault();
       window.location.hash = route;
-      // Close mobile nav
       nav.classList.remove('nav--open');
     });
     nav.appendChild(a);

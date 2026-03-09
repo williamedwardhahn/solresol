@@ -3,6 +3,7 @@ import { getColor } from '../utils/solresol.js';
 import { getSyllableNotations, NOTATION_SYSTEMS } from '../utils/notation.js';
 import { playNote, playWord } from '../audio/synth.js';
 import { emit } from '../utils/events.js';
+import { setFocusWord } from '../state/focus-word.js';
 
 /**
  * Unified word display component.
@@ -35,11 +36,24 @@ export function createWordRenderer(word, opts = {}) {
     showDefinition = false,
     showReverse = false,
     reactive = true,
+    clickToFocus = true,
     onReverse,
   } = opts;
 
   const el = document.createElement('div');
   el.className = 'word-renderer';
+
+  // Click anywhere on the renderer to focus this word in the context panel
+  if (clickToFocus) {
+    el.classList.add('word-renderer--focusable');
+    el.addEventListener('click', (e) => {
+      // Don't trigger if clicking a button (play, reverse, etc.)
+      if (e.target.closest('button')) return;
+      if (!word.isEmpty) {
+        setFocusWord(word.syllables);
+      }
+    });
+  }
 
   let unsub = null;
 
