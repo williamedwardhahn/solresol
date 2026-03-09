@@ -1,4 +1,5 @@
 import { parseWord, getColor, syllableToNumber } from './solresol.js';
+import { displaySyllable, displayWord } from './format.js';
 
 /**
  * Seven notation systems for Solresol.
@@ -34,7 +35,7 @@ export function getAllNotations(word) {
   if (syllables.length === 0) return null;
 
   return {
-    solfege: syllables.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(''),
+    solfege: displayWord(syllables),
     numbers: syllables.map(s => syllableToNumber(s)).join(''),
     colors: syllables.map(s => getColor(s)),
     binary: syllables.map(s => BINARY[s]).join(' '),
@@ -48,7 +49,7 @@ export function getAllNotations(word) {
 export function getSyllableNotations(syllable) {
   const s = syllable.toLowerCase();
   return {
-    solfege: s.charAt(0).toUpperCase() + s.slice(1),
+    solfege: displaySyllable(s),
     number: syllableToNumber(s),
     color: getColor(s),
     binary: BINARY[s] || '',

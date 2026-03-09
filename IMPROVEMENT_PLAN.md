@@ -1,491 +1,622 @@
-# Solresol v3: From Application to Medium
-## Improvement Plan — Based on Brett Victor & Alan Kay Code Review (2026-03-09)
+# Solresol v4: From Tool to Instrument
+## Improvement Plan — Based on Brett Victor & Alan Kay Code Review v3 (2026-03-09)
 
-> **Context:** v2 completed the architectural unification (SolresolWord model, WordRenderer,
-> event bus, 4 views, sequencer, sunburst, composer, quiz modes). The foundation is solid.
-> v3 addresses the deeper critiques: the site is still a *reference tool about* Solresol,
-> not a *medium for thinking in* Solresol. Every display should be an input. Every
-> representation should be live. The walls between views should dissolve.
+> **Context:** v3 completed the word predictor, mirror ghost, flip animation,
+> onboarding, persistent sentence bar, stress toggles, model mutations, and
+> structural analysis. The model layer is sound. But the interface still presents
+> seven *views* of one thing instead of one *thing* that is seven views. The
+> representations are spatially separated. There is no model of language beyond
+> word-level. The rendering has no continuity — every interaction destroys and
+> rebuilds the DOM. The views are rooms without hallways.
+>
+> v4 addresses these structural problems. The goal: you don't *use* the site
+> to learn Solresol — you *think* in Solresol through the site.
 
 ---
 
-## Phase 0: Enrich the Core Model
+## Phase 0: Fix Structural Defects
 
-The `SolresolWord` model works but is designed for observation, not manipulation.
-The grammar engine is a lookup table, not a computation. Fix both.
+Bugs and architectural smells that undermine everything else.
 
-### 0.1 Expand SolresolWord Mutation API
+### 0.1 Sequencer AudioContext Leak
 
-**File:** `src/models/word.js`
+**File:** `src/components/sequencer.js:190`
 
-Add manipulation methods that enable the interactive experiences in later phases:
+The sequencer creates a new `AudioContext` on every `startPlayback()`. This leaks
+contexts (browsers limit to ~6) and bypasses the singleton in `synth.js`.
+
+**Fix:** Import and use `playNote`/`playWord` from `synth.js` instead of manually
+creating oscillators. The sequencer's `scheduleAudio()` function duplicates the
+entire ADSR envelope logic. Delete it and delegate to the synth.
+
+### 0.2 Canonical Syllable Display
+
+**File:** new `src/utils/format.js`
+
+`capitalize()` is written inline 5+ times across the codebase. Extract:
 
 ```js
-swap(i, j)         // swap two syllables (drag-to-rearrange)
-insertAt(i, syl)   // insert syllable at position (direct editing)
-removeAt(i)        // remove syllable at position
-reverse()          // in-place reversal (antonym flip)
-```
-
-Also add a `stressPosition` property (null, 'last', 'penultimate', 'antepenultimate')
-that changes the computed `partOfSpeech` (noun/adjective/verb/adverb). This makes
-stress rules *live computed properties*, not reference text.
-
-### 0.2 Make Every Word "Exist"
-
-**File:** `src/models/word.js`, `src/utils/solresol.js`
-
-Change `SolresolWord.exists` from `this.definition !== null` to `this.length > 0`.
-Every 1-5 syllable combination IS a Solresol word. Add:
-
-```js
-get isDefined()    // has a dictionary entry (current `exists` behavior)
-get isStructural() // is a tense marker, particle, or grammar word
-get inferredCategory() // computed from first syllable even for undefined words
-get inferredPartOfSpeech() // computed from stress + syllable count
-```
-
-For undefined words, display category inference and structural analysis instead
-of showing nothing. "This word isn't in the historical dictionary, but based on
-its structure it would belong to the Mi (Emotions) family."
-
-### 0.3 Active Grammar Engine
-
-**File:** `src/utils/grammar.js`
-
-Add computational functions that *use* the grammar rules, not just store them:
-
-```js
-inferPartOfSpeech(word, stressPos)  // stress → part of speech
-applySyllableStress(syllables, pos) // returns modified audio params (gain, duration)
-suggestRole(word)                   // given a word, what sentence roles could it fill?
-analyzeWord(word)                   // full structural analysis: category, possible POS,
-                                    // antonym exists?, syllable count class, etc.
-```
-
-These power the "meaning landscape" and structural quiz features in later phases.
-
----
-
-## Phase 1: The Meaning Landscape (Keyboard → Understanding)
-
-The single highest-impact change: as the user plays notes, show them where they
-are in the *space of possible meaning*, not just what syllables they've entered.
-
-### 1.1 Predictive Word Fan
-
-**Files:** `src/components/global-keyboard.js` (modify `renderBuilding()`),
-new `src/components/word-predictor.js`
-
-Replace the current "color blocks + definition" building display with a **live
-word prediction fan**:
-
-- After pressing Do, show all 7 Do- families as colored branches (451 words total)
-- After Do-Re, show all DoRe- words (specific entries) narrowing the tree
-- After Do-Re-Mi, either show the exact word or "undefined — would be in Re family"
-- Each branch shows its category label and word count
-- Hovering a branch previews its sound; clicking selects it (auto-completes)
-
-**Implementation:** Build a trie from dictionary entries at init time. On each
-syllable push, walk the trie and render immediate children as a fan/list. Use
-the sunburst's arc-drawing code (`sunburst.js` `createArc()`) for the visual,
-or a simpler vertical list for the building area.
-
-**Data flow:**
-```
-focusWord.onChange → walk trie → render predictions in gk-building area
-```
-
-This transforms the keyboard from "press notes, hope for meaning" to
-"navigate through the space of all possible words."
-
-### 1.2 Persistent Keyboard Status Line
-
-**File:** `src/components/global-keyboard.js`
-
-Below the building area, add a status line that always shows:
-- Current word's category (from first syllable, computed live)
-- Current syllable count class ("2-syl = pronouns/particles")
-- Whether the current prefix has any dictionary matches
-- If the word is defined: its definition, live-updating
-
-This uses `analyzeWord()` from Phase 0.3.
-
----
-
-## Phase 2: Bidirectional Representations
-
-Every notation system becomes an input, not just an output.
-
-### 2.1 Editable Word Renderer
-
-**File:** `src/components/word-renderer.js`
-
-Add an `editable: true` option to `createWordRenderer()`:
-
-- **Color blocks become draggable.** Drag to reorder syllables (calls `word.swap()`).
-  Drop a block outside to remove it (calls `word.removeAt()`). Drop from the
-  keyboard to insert (calls `word.insertAt()`).
-
-- **Notation cells become clickable inputs.** Click a number cell → cycle through
-  1-7 to change that syllable. Click a solfege cell → inline edit. Click a
-  braille cell → cycle through braille patterns.
-
-- **Sheet music notes become draggable.** Drag a note up/down on the staff to
-  change pitch (syllable). The SVG note position maps to syllable via `NOTE_POS`
-  in `word-renderer.js` line 253.
-
-All inputs call the corresponding mutation on the `SolresolWord`, which triggers
-`_notify()`, which re-renders all other representations. The model is already
-observable — this just adds more ways to mutate it.
-
-### 2.2 Draw-to-Play Binary Input
-
-**File:** new `src/components/binary-input.js`
-
-A grid of 3 rows x N columns. Click cells to toggle (binary 001-111 maps to
-Do-Si). As you draw a binary pattern, the corresponding syllables appear,
-the sound plays, and the word forms. This makes binary notation a *live input
-channel* rather than a display curiosity.
-
-Mount it in the Play view as an alternative input mode alongside the keyboard.
-
-### 2.3 Voice Input (Web Speech API)
-
-**File:** new `src/components/voice-input.js`
-
-Use the Web Speech API's `SpeechRecognition` to listen for spoken syllables.
-Map recognized words (do/re/mi/fa/sol/la/si) to `focusWord.push()`. Show
-a microphone button in the global keyboard actions area.
-
-Graceful fallback: if `SpeechRecognition` is unavailable, hide the button.
-This adds a third I/O channel (keyboard, MIDI, voice) toward the goal of
-channel-independent interaction.
-
----
-
-## Phase 3: Omnipresent Antonym Reversal
-
-Reversal is Solresol's deepest structural principle. It should be everywhere,
-not buried in a dictionary sub-tab.
-
-### 3.1 Mirror Presence
-
-**File:** `src/components/word-renderer.js`
-
-When a `WordRenderer` displays a word with 2+ syllables, show a **ghost mirror**
-beneath it: the reversed syllables at 20% opacity with the antonym definition
-(if it exists). This is always visible, always reminding the user of the symmetry.
-
-CSS: `.wr-mirror { opacity: 0.2; transition: opacity 0.3s; }`
-On hover: `.word-renderer:hover .wr-mirror { opacity: 0.6; }`
-
-### 3.2 Flip Animation
-
-**File:** `src/components/word-renderer.js`
-
-The existing Reverse button (line 206-220) currently just calls `word.set(reversed)`.
-Replace with an animation:
-
-1. Color blocks slide to their reversed positions (CSS transitions on `order` or
-   `transform: translateX(...)`)
-2. During the slide, play the reversed sequence
-3. Definition cross-fades from original to antonym
-4. Mirror ghost swaps to show the original word
-
-The `SolresolWord.reverse()` (new in-place method from 0.1) triggers the animation
-via the existing `onChange` subscription.
-
-### 3.3 Swipe-to-Reverse on Mobile
-
-**File:** `src/components/word-renderer.js`
-
-Add touch handlers: swipe left on any WordRenderer to reverse the word. The same
-flip animation plays. This makes the structural principle a physical gesture.
-
----
-
-## Phase 4: Dissolve the Views
-
-The dictionary, sunburst, sequencer, and keyboard should be aspects of one
-experience, not four tabs.
-
-### 4.1 Unified Canvas Layout
-
-**File:** `src/app.js`, `index.html`, new `src/layouts/unified.js`
-
-Replace the 4-tab navigation with a **workspace layout**:
-
-```
-+------------------------------------------+
-| Header                                   |
-+------------------------------------------+
-| [Global Keyboard with predictor]         |
-+------------------+-----------------------+
-|                  |                       |
-|   Main Panel     |   Context Panel       |
-|   (active view)  |   (word details)      |
-|                  |                       |
-+------------------+-----------------------+
-| [Sentence Bar — committed words always visible] |
-+------------------------------------------+
-```
-
-Key changes:
-- **Sentence bar** at the bottom always shows committed words (currently only
-  visible in Play view's free mode). Any word played from any view adds to it.
-- **Context panel** stays as-is (already works globally).
-- **Main panel** still routes between views, but the keyboard + sentence bar
-  persist across all of them.
-- Navigation becomes icons in the header, not a separate nav bar.
-
-### 4.2 Sunburst as Keyboard Visualization
-
-**File:** `src/components/sunburst.js`, `src/components/global-keyboard.js`
-
-When the user plays notes on the keyboard, highlight the corresponding path
-in the sunburst (if visible). After Do, the Do sector lights up. After Do-Re,
-the DoRe sub-sector lights up. This connects the act of playing to the spatial
-structure of the vocabulary.
-
-**Implementation:** Emit `syllable:play` events (already exists at
-`global-keyboard.js` line 182). The sunburst listens and highlights the
-matching arc by adding a `.sunburst-arc--active` class.
-
-### 4.3 Sequencer Records from Anywhere
-
-**File:** `src/components/sequencer.js`, `src/state/focus-word.js`
-
-The sequencer already has `addWord()` and `isRecording()`, and the play view
-already auto-adds committed words during recording (`play.js` line 169-171).
-Extend this: when the sequencer is recording, committed words from ANY view
-(dictionary click, translate result, quiz answer) add to the sequence.
-
-**Implementation:** Move the recording listener from `play.js` to `sequencer.js`
-itself — have it listen globally for `word:commit` events via the event bus.
-
-### 4.4 Deep Links Between Views
-
-**Files:** All views
-
-Every word displayed anywhere should be a portal to every other view:
-
-- Click a word in the dictionary → opens in context panel (already works)
-- Context panel "Find in Dictionary" → navigates to dictionary with search (already works)
-- Context panel "Show on Sunburst" → navigates to sunburst zoomed to that word's sector (NEW)
-- Context panel "Add to Sequencer" → adds word to sequencer timeline (NEW)
-- Context panel "Quiz Me" → switches to Learn view with that word as the quiz target (NEW)
-- Sunburst click → opens context panel (already works)
-
-These are small additions to `context-panel.js` — new buttons that emit
-navigation events.
-
----
-
-## Phase 5: Discovery-First Learning
-
-### 5.1 Guided First Experience
-
-**File:** new `src/components/onboarding.js`, modify `src/app.js`
-
-On first visit (check `localStorage` for `solresol:onboarded`), replace the
-Play view with a guided sequence:
-
-1. **"Hear this melody"** — play DoReMi automatically. Show colored blocks appearing
-   one by one as each note sounds. Pause.
-2. **"That was a word"** — reveal the definition. "DoReMi" means something.
-3. **"Now you play"** — highlight the keyboard. Prompt: "Press 1, 2, 3."
-4. **"Every combination is a word"** — let them play freely, showing definitions
-   as they form words.
-5. **"Colors ARE sounds ARE numbers"** — show the same word in all 7 notations.
-6. **"Reverse it"** — show the antonym flip. "Now press 3, 2, 1."
-7. **"You're speaking Solresol"** — transition to normal Play view.
-
-Total: ~60 seconds. Skippable. Sets the tone: this is a *medium*, not a reference.
-
-### 5.2 Structural Quiz Redesign
-
-**File:** `src/views/learn.js`
-
-Replace the five separate quiz modes with a **progressive discovery** system:
-
-**Level 1: Ear Training** (existing, keep as-is)
-- Hear note → identify by color/name
-
-**Level 2: Pattern Discovery** (NEW — replaces category quiz)
-- Play 3 words that start with Mi. Ask: "What do these have in common?"
-- Show categories only AFTER the user guesses
-- The system doesn't TELL you "first syllable = category" — you DISCOVER it
-
-**Level 3: Symmetry Discovery** (NEW — replaces antonym quiz)
-- Play FaLa (good). Play LaFa (bad). Ask: "What happened?"
-- Let user reverse 3 more words and observe the meaning changes
-- The reversal principle is DISCOVERED, not stated
-
-**Level 4: Grammar Discovery** (NEW)
-- Play the same word with different stress. Ask: "What changed?"
-- Show the word used as noun, then adjective, then verb
-- Stress rules are EXPERIENCED, not memorized
-
-**Level 5: Composition Challenge** (NEW — replaces translation quiz)
-- "Express this idea in Solresol" — open-ended, uses composer
-- Multiple valid answers accepted (check via reverse-translate)
-- Score based on whether the result translates back correctly
-
-### 5.3 Spaced Repetition with Structure Awareness
-
-**File:** `src/utils/quiz-engine.js` (new)
-
-Track per-concept mastery, not per-word:
-```js
-{
-  concepts: {
-    'note-recognition': { correct: N, total: N, lastSeen },
-    'category-do': { ... },  // per-category mastery
-    'category-mi': { ... },
-    'reversal': { ... },
-    'stress-rules': { ... },
-    'composition': { ... }
-  },
-  words: {
-    'Dore': { correct: N, total: N, lastSeen },
-    ...
-  }
+export function displaySyllable(syl) {
+  return syl.charAt(0).toUpperCase() + syl.slice(1);
+}
+export function displayWord(syllables) {
+  return syllables.map(displaySyllable).join('');
 }
 ```
 
-Preferentially quiz weak concepts and unfamiliar words. Store in `localStorage`.
+Replace all inline `s.charAt(0).toUpperCase() + s.slice(1)` calls.
 
----
-
-## Phase 6: Persistence — A Medium Remembers
-
-### 6.1 Save/Load Compositions
-
-**File:** `src/state/focus-word.js`, `src/components/sequencer.js`
-
-- Save committed sentences to `localStorage` under `solresol:compositions`
-- Save sequencer timelines under `solresol:sequences`
-- UI: "Save" and "Load" buttons in both Play and Sequencer views
-- Export: JSON format, importable via paste/file
-
-### 6.2 Personal Vocabulary
-
-**File:** new `src/state/vocabulary.js`
-
-- Let users "star" words → saved to `solresol:vocabulary`
-- Add a star button to the context panel
-- Personal vocab appears as a filterable set in dictionary
-- Quiz preferentially uses starred words
-- For undefined words (not in dictionary), let users propose definitions
-  stored locally
-
-### 6.3 Session Continuity
+### 0.3 Split focusWord Into Two Concerns
 
 **File:** `src/state/focus-word.js`
 
-- Save `committedWords` to `localStorage` on every commit
-- Restore on page load
-- The sentence bar survives page refresh and navigation
-- Add "New Sentence" button to explicitly clear
+`focusWord` is simultaneously the keyboard input buffer AND the inspection target.
+This means you can't inspect a word while building another.
+
+**Split into:**
+- `buildingWord` — the word being constructed note-by-note (keyboard writes here)
+- `inspectedWord` — the word shown in the context panel (clicking any word writes here)
+
+`setFocusWord()` → `inspectWord()` (only opens panel, doesn't touch building word)
+`commitFocusWord()` → `commitBuildingWord()` (commits from building word)
+
+The global keyboard writes to `buildingWord`. Click-to-focus writes to `inspectedWord`.
+These are independent. You can build "DoReMi" while inspecting "FaLa" in the panel.
+
+### 0.4 Declarative Input Routing
+
+**File:** `src/components/global-keyboard.js`
+
+Replace `captureKeyboard`/`releaseKeyboard` (global mutex on a function pointer)
+with a priority-based input stack:
+
+```js
+const inputStack = []; // [{ id, handler, priority }]
+
+export function pushInputHandler(id, handler, priority = 0) { ... }
+export function popInputHandler(id) { ... }
+// Keydown dispatches to highest-priority handler
+```
+
+Quiz pushes a handler at high priority. When quiz exits, it pops. No global
+mutex. Multiple handlers can coexist (e.g., quiz captures 1-7 but Escape still
+closes the panel).
+
+### 0.5 Component Lifecycle Guard
+
+**File:** new `src/utils/lifecycle.js`
+
+The pattern `if (renderer) { renderer.destroy(); renderer = null; }` appears
+12+ times. It's manual memory management. Create a guard:
+
+```js
+export function managed() {
+  const refs = [];
+  return {
+    track(component) { refs.push(component); return component; },
+    destroyAll() { refs.forEach(r => r.destroy?.()); refs.length = 0; },
+  };
+}
+```
+
+Each view/component creates a `managed()` scope. Its cleanup function calls
+`destroyAll()`. No more manual null-checking.
 
 ---
 
-## Phase 7: Polish & Performance
+## Phase 1: DOM Continuity
 
-### 7.1 Animated Transitions
+Stop destroying the DOM on every state change. Objects should have visual
+persistence — they move, they morph, they don't vanish and reappear.
 
-**Files:** CSS + view render functions
+### 1.1 Incremental Word Renderer
 
-- View transitions: fade/slide between views instead of hard DOM replacement
-- Word commit: current flash animation (play.js line 166) is good, extend to
-  all contexts
-- Context panel: word morphs when switching between words instead of full rebuild
-  (modify `showWord()` in context-panel.js to diff and transition)
+**File:** `src/components/word-renderer.js`
 
-### 7.2 Sunburst Performance
+Currently `render()` sets `el.innerHTML = ''` and rebuilds everything. Instead:
 
-**File:** `src/components/sunburst.js`
+- On first render, build the DOM once and keep references to mutable elements
+- On `word.onChange()`, diff against previous state:
+  - Syllable added → animate new column sliding in from right
+  - Syllable removed → animate column sliding out
+  - Syllable changed → cross-fade color, update notation text
+  - Stress changed → animate ring appearance/movement
+- Sheet music SVG updates individual note elements, not full rebuild
+- Definition text cross-fades
 
-- Current: full SVG re-render on zoom (`svg.innerHTML = ''`, line 62)
-- New: animate arc transitions using `d` attribute interpolation
-- Add spatial continuity: zooming in/out should feel like camera movement
+**Key principle:** The DOM elements for syllable columns are persistent objects.
+They are created, they change, they are removed — but they are never bulk-destroyed
+and recreated.
 
-### 7.3 Audio Improvements
+### 1.2 Persistent Building Area
+
+**File:** `src/components/global-keyboard.js`
+
+`renderBuilding()` currently destroys and recreates the word renderer AND word
+predictor on every `focusWord.onChange`. Instead:
+
+- Create the word renderer and predictor once
+- Set them to `reactive: true` so they self-update
+- Only recreate when transitioning between empty/non-empty states
+
+### 1.3 Context Panel Morphing
+
+**File:** `src/components/context-panel.js`
+
+`showWord()` currently clears the panel content and rebuilds. Instead:
+
+- Keep the renderer alive, call `displayWord.set(newSyllables)`
+- The reactive renderer handles the visual update
+- Category, antonym, actions sections update in place via DOM references
+- History chips append/remove, not rebuild
+- Switching between words feels like the panel *changes* rather than *reloads*
+
+### 1.4 View Transitions
+
+**File:** `src/app.js`, CSS
+
+When navigating between views:
+- Outgoing view fades/slides out (CSS `opacity` + `transform`)
+- Incoming view fades/slides in
+- Use `View Transitions API` where supported, CSS fallback otherwise
+- The keyboard, sentence bar, and context panel never participate in transitions
+  (they're persistent)
+
+---
+
+## Phase 2: Unified Representations
+
+Seven views of one thing → one thing that is seven views.
+
+### 2.1 Column-as-Object
+
+**File:** `src/components/word-renderer.js`
+
+Each syllable column should be a single interactive object, not a stack of
+independent DOM elements:
+
+```
+┌─────────┐
+│  [Red]   │  ← color block (click = play, drag = reorder)
+│   Do     │  ← solfege label
+│    1     │  ← number
+│   001    │  ← binary
+│    ⠁     │  ← braille
+│    ♩     │  ← note head (integrated, not separate SVG)
+└─────────┘
+```
+
+The column is one `<div>` with one click handler, one drag handler, one hover
+state. Cross-highlighting already exists but currently queries by `data-syl-index`
+across disconnected elements. With column-as-object, highlighting is just adding
+a class to the column container.
+
+The staff is not a separate SVG below — the note head lives inside the column,
+and a background SVG draws the connecting staff lines across all columns.
+
+### 2.2 Editable Columns
+
+**File:** `src/components/word-renderer.js`
+
+Add `editable: true` option:
+
+- **Drag to reorder:** `pointerdown` on color block starts drag. Drop between
+  columns to `insertAt`/`removeAt`+`insertAt`. Drop outside to `removeAt`.
+  Uses the existing mutation API on `SolresolWord`.
+
+- **Click notation to cycle:** Click number cell → increment 1→2→...→7→1,
+  which changes the syllable at that position. Click solfege → inline edit.
+  All mutations go through `word.syllables[i] = newSyl; word._notify()` or
+  a new `replaceAt(i, syl)` method.
+
+- **Drag note on staff:** Drag note head up/down to change pitch. Map Y
+  position to syllable via `NOTE_POS` mapping.
+
+### 2.3 Paint-to-Play Color Input
+
+**File:** new `src/components/color-input.js`
+
+A row of 7 color wells. Click a well, then click cells in a grid to paint that
+color. Each painted cell becomes a syllable. The word forms as you paint, the
+sound plays. An alternate input mode mounted in the Play view.
+
+This makes color not just a display — it's a composition tool.
+
+---
+
+## Phase 3: Language Model
+
+The system has a word model but no language model. Sentences are arrays of
+words. Grammar is a slot-filler. Fix this.
+
+### 3.1 Sentence Object
+
+**File:** new `src/models/sentence.js`
+
+```js
+export class SolresolSentence {
+  constructor() {
+    this.words = [];      // SolresolWord[]
+    this._listeners = new Set();
+  }
+
+  // Structure
+  get subject() { ... }     // first noun-role word
+  get verb() { ... }        // first verb-role word
+  get isQuestion() { ... }  // ends with Sol particle
+  get isNegated() { ... }   // has Do particle before verb
+  get tense() { ... }       // detected from tense marker presence
+
+  // Mutations
+  addWord(word) { ... }
+  removeWord(index) { ... }
+  moveWord(from, to) { ... }
+  setTense(tenseKey) { ... }  // insert/replace tense marker
+  negate() { ... }            // insert/remove Do particle
+  askQuestion() { ... }       // append/remove Sol
+
+  // Translation
+  get translation() { ... }   // English gloss with grammar awareness
+  get grammaticalAnalysis() { ... }  // role assignment for each word
+
+  // Observable
+  onChange(fn) { ... }
+
+  // Persistence
+  toJSON() { ... }
+  static fromJSON(data) { ... }
+}
+```
+
+Replace `committedWords` array with a `SolresolSentence` instance. The sentence
+bar renders from this object. The compose mode manipulates this object directly
+instead of slot-filling a function.
+
+### 3.2 Grammar as Computation
+
+**File:** `src/utils/grammar.js`
+
+Extend beyond `buildSentence()` (which just concatenates strings):
+
+```js
+// Analyze a sequence of words for grammatical structure
+export function analyzeGrammar(words) {
+  return {
+    roles: assignRoles(words),       // [{word, role: 'subject'|'verb'|...}]
+    tense: detectTense(words),       // detected tense marker
+    isValid: checkWordOrder(words),  // basic word order validation
+    suggestions: suggestNext(words), // what grammatical role is missing?
+  };
+}
+
+// Given partial sentence, what should come next?
+export function suggestNext(words) {
+  // Word order: subject → directObj → adj → tense → verb → adv → indirectObj
+  // Returns: ['verb', 'adjective'] — roles not yet filled
+}
+
+// Stress-aware audio parameters
+export function stressParams(word) {
+  const idx = word.stressIndex;
+  return word.syllables.map((syl, i) => ({
+    syllable: syl,
+    gain: i === idx ? 0.5 : 0.3,
+    duration: i === idx ? 0.6 : 0.4,
+  }));
+}
+```
+
+### 3.3 Live Grammar Feedback
+
+**File:** `src/components/sentence-bar.js`
+
+The sentence bar currently shows chips + translation. With the Sentence model:
+
+- Color-code chips by grammatical role (subject = blue outline, verb = green, etc.)
+- Show grammar suggestions: "Add a verb" if no verb detected
+- Animate word insertion/removal instead of rebuilding chip list
+- Drag to reorder words within the sentence
+- The translation updates live and is grammar-aware ("I [past] go" not "I dodo go")
+
+---
+
+## Phase 4: The Predictor as Primary Interface
+
+Brett Victor's core critique: the word predictor is the best component but it's
+crammed into a tiny bar. The narrowing of possibility space should be the
+primary visual.
+
+### 4.1 Expanded Predictor Display
+
+**File:** `src/components/word-predictor.js`, `styles/components.css`
+
+When the keyboard is focused (user is actively building):
+
+- The predictor expands to fill the main content area (not just the keyboard bar)
+- Branches shown as a radial or tree layout, not a vertical text list
+- Each branch shows color pip + syllable + word count + sample definitions (already exists)
+- Animate branch expansion/contraction as syllables are added/removed
+- The "meaning landscape" IS the primary workspace during word-building
+
+When a word is committed, the predictor contracts back to the keyboard bar
+and the main content returns.
+
+### 4.2 Predictor ↔ Sunburst Fusion
+
+**File:** `src/components/word-predictor.js`, `src/components/sunburst.js`
+
+The predictor and sunburst show the same data (the tree of all words) in
+different forms. Connect them:
+
+- When the sunburst is visible, playing notes highlights the corresponding
+  path through the sunburst arcs
+- Clicking a sunburst arc adds that syllable to the building word
+- The predictor and sunburst are two projections of the same trie
+
+### 4.3 Dead-End Creativity
+
+**File:** `src/components/word-predictor.js`
+
+When the user reaches a dead end (no dictionary words continue from the current
+prefix), don't just show "No dictionary words continue." Instead:
+
+- Show the structural analysis: "This 4-syllable Fa-family word would be in
+  the Core Vocabulary class"
+- Show what the antonym would be (reversed syllables) and whether IT is defined
+- Invite: "This word doesn't exist yet. What should it mean?"
+- Store user-proposed definitions in `localStorage` for personal vocabulary
+
+---
+
+## Phase 5: Discovery-Based Learning
+
+The quiz should emerge from use, not from a separate "Learn" tab.
+
+### 5.1 Fix Onboarding
+
+**File:** `src/components/onboarding.js`
+
+Current onboarding plays DoReMi for the user. The user watches, not discovers.
+
+**Change step 1:** Don't auto-play. Instead, prompt: "Press any three keys."
+The user plays something random. THEN reveal: "You just played [word]. It
+means [definition]." Or if undefined: "That combination doesn't have a meaning
+yet — but [nearby word] does."
+
+The "aha" comes from the user's OWN notes having meaning, not from watching
+a demonstration.
+
+### 5.2 Contextual Micro-Quizzes
+
+**File:** new `src/components/micro-quiz.js`
+
+Instead of a separate quiz view, embed tiny quiz moments in normal use:
+
+- After playing a word 3 times, briefly flash: "Quick — what does [antonym] mean?"
+- After inspecting a category, ask: "Which of these belongs to the same family?"
+- After committing a sentence, ask: "What tense is this?"
+- After the sunburst, ask: "Which sector has the most words?"
+
+These are 5-second interruptions, not full quiz sessions. They appear as
+toast-style overlays. Correct = brief confirmation. Wrong = brief correction.
+Always dismissable.
+
+### 5.3 Spaced Repetition Engine
+
+**File:** new `src/utils/srs.js`
+
+Track what the user has encountered and how well they know it:
+
+```js
+const SRS_KEY = 'solresol:srs';
+
+export function recordEncounter(wordText, context) { ... }
+export function recordQuizResult(concept, correct) { ... }
+export function getWeakConcepts() { ... }    // least-mastered areas
+export function getStaleWords() { ... }      // words not seen recently
+export function shouldQuiz() { ... }         // time for a micro-quiz?
+export function getNextQuizItem() { ... }    // what to quiz on
+```
+
+Concepts tracked: note recognition, category membership, reversal, stress→POS,
+tense markers, word order. Per-word familiarity tracked by encounter count
+and quiz performance.
+
+### 5.4 Progressive Quiz Overhaul
+
+**File:** `src/views/learn.js`
+
+Replace the 5 random-choice quiz modes with progressive discovery levels:
+
+1. **Ear Training** — keep as-is, works well
+2. **Pattern Discovery** — play 3 words sharing a trait, ask "what's common?"
+   (replaces category quiz that just tells you the answer)
+3. **Symmetry Discovery** — play word + antonym, ask "what happened?"
+   (replaces antonym quiz)
+4. **Grammar Discovery** — same word with different stress, ask "what changed?"
+   (new — makes stress rules experiential)
+5. **Composition** — "Express this idea" with open-ended input, multiple valid answers
+   (replaces translation quiz)
+
+Progression unlocks: Level 2 requires 10 correct in Level 1, etc.
+SRS engine feeds words into each level.
+
+---
+
+## Phase 6: Connective Tissue
+
+The views are rooms without hallways. Create the hallways.
+
+### 6.1 Universal Word Actions
+
+**File:** `src/components/context-panel.js`
+
+Every word, everywhere, when focused in the context panel, gets:
+
+- **Dictionary** — navigate to dictionary filtered to this word (exists)
+- **Sunburst** — zoom sunburst to this word's sector (exists)
+- **Add to Sentence** — append to current sentence (new)
+- **Add to Sequencer** — append to sequencer timeline (new)
+- **Quiz Me** — start a micro-quiz about this word (new)
+- **Star** — add to personal vocabulary (new)
+- **Share** — export word card as PNG (exists)
+
+### 6.2 Cross-View Recording
+
+**File:** `src/components/sequencer.js`
+
+Move recording listener from `play.js` to the sequencer itself. When recording,
+`word:commit` events from ANY view add to the sequence. Clicking a dictionary
+entry while recording adds it. The sequencer becomes a cross-view clipboard.
+
+### 6.3 Sentence Persistence & Management
+
+**File:** `src/state/focus-word.js` → refactored with `src/models/sentence.js`
+
+- Multiple saved sentences (not just current)
+- Save/load from localStorage under `solresol:sentences`
+- UI: "Save Sentence", "Load Sentence", "New Sentence" in sentence bar
+- Export as JSON, sharable
+
+### 6.4 Personal Vocabulary
+
+**File:** new `src/state/vocabulary.js`
+
+- Star words from context panel → saved to `solresol:starred`
+- Personal vocab filterable in dictionary view
+- SRS engine prioritizes starred words
+- For undefined words, save user-proposed definitions
+
+---
+
+## Phase 7: Audio as First-Class Medium
+
+### 7.1 Stress in Audio
 
 **File:** `src/audio/synth.js`
 
-- Add reverb/delay effects for richer sound
-- Stress visualization: louder + longer for stressed syllables (connect to
-  `stressPosition` from Phase 0.1)
-- Waveform preview: hear a short sample when changing waveform in the keyboard
+When playing a word with a stress position set, the stressed syllable should
+be louder (gain 0.5 vs 0.3) and slightly longer (duration * 1.3). Use
+`stressParams()` from Phase 3.2. The stress isn't just visual — you hear it.
 
-### 7.4 Delete Legacy Files
+### 7.2 Reverb & Space
 
-**Directory:** `src/views/_archive/`, `legacy/`
+**File:** `src/audio/synth.js`
 
-Remove the 10 archived views and 21 legacy HTML/CSS files. They served their
-purpose during unification. The v3 codebase should be clean.
+Add a convolution reverb node to the audio chain (small room impulse response).
+Makes the sounds feel like an instrument, not a test tone generator. Optional,
+togglable from the waveform selector area.
 
----
+### 7.3 Sequencer Uses Synth Module
 
-## Implementation Priority
+**File:** `src/components/sequencer.js`
 
-| Priority | Phase | Items | Rationale |
-|----------|-------|-------|-----------|
-| **P0** | 0.1, 0.2 | Model enrichment | Foundation for everything else |
-| **P0** | 1.1 | Predictive word fan | Single highest-impact UX change |
-| **P1** | 3.1, 3.2 | Mirror + flip animation | Makes the deepest structural principle visceral |
-| **P1** | 5.1 | Guided first experience | Transforms the entry point from confusion to discovery |
-| **P1** | 6.3 | Session continuity | Essential for "medium remembers" |
-| **P2** | 2.1 | Editable word renderer | Bidirectional representations |
-| **P2** | 4.1, 4.4 | Unified layout + deep links | Dissolves walls between views |
-| **P2** | 5.2 | Structural quiz redesign | Discovery over memorization |
-| **P3** | 0.3 | Active grammar engine | Powers structural quiz + composition |
-| **P3** | 2.2, 2.3 | Binary input, voice input | Additional I/O channels |
-| **P3** | 4.2, 4.3 | Sunburst-keyboard link, global recording | Cross-view integration |
-| **P3** | 6.1, 6.2 | Save/load, personal vocab | Full persistence |
-| **P4** | 7.* | Transitions, performance, audio, cleanup | Polish |
+Delete `scheduleAudio()` and its manual oscillator creation. Use `playWord()`
+and `playSentence()` from `synth.js` with `startTime` offsets. Single audio
+context, single envelope shape, consistent sound.
 
 ---
 
-## What Stays (v2 Strengths)
+## Phase 8: Polish
 
-- Vanilla JS + Vite (no frameworks)
-- `SolresolWord` observable model
-- `WordRenderer` unified display
-- Event bus (`events.js`)
-- Web Audio synth with ADSR
-- Web MIDI input
-- 4-view architecture (refined, not replaced)
-- Sunburst visualization
-- Sequencer with MIDI export
-- Context panel
-- Dark theme + responsive CSS
+### 8.1 Dictionary Search via Trie
+
+**File:** `src/utils/solresol.js`, `src/components/word-predictor.js`
+
+The trie already exists in the predictor. Export it and use for `searchDictionary()`
+prefix matching (currently O(n) filter). Keep substring fallback for English
+definition search.
+
+### 8.2 Swipe Gestures
+
+**File:** `src/components/word-renderer.js`
+
+- Swipe left on any word renderer → reverse (antonym flip)
+- Swipe right → play the word
+- Touch-friendly alternative to buttons
+
+### 8.3 Accessibility Audit
+
+- Add `aria-live="polite"` to predictor status line, sentence bar translation
+- Ensure all interactive elements have focus styles
+- Screen reader: announce syllable played, word committed, definition shown
+- Keyboard navigation through predictor branches (arrow keys)
+
+---
+
+## Implementation Order
+
+| Order | Phase | What | Why |
+|-------|-------|------|-----|
+| **1** | 0.1 | Fix sequencer AudioContext leak | Bug, 10 min fix |
+| **2** | 0.2 | Extract capitalize/displaySyllable | Tech debt, 15 min |
+| **3** | 0.5 | Component lifecycle guard | Prevents leaks during later work |
+| **4** | 0.3 | Split focusWord → buildingWord + inspectedWord | Unblocks Phase 1.3, 2.2, 4.1 |
+| **5** | 1.1 | Incremental word renderer | Foundation for all visual continuity |
+| **6** | 1.2 | Persistent building area | Stops re-creating predictor every keystroke |
+| **7** | 2.1 | Column-as-object | Unifies representations physically |
+| **8** | 3.1 | Sentence object | Foundation for grammar features |
+| **9** | 3.2 | Grammar as computation | Powers sentence bar and compose mode |
+| **10** | 3.3 | Live grammar feedback in sentence bar | First visible payoff of sentence model |
+| **11** | 4.1 | Expanded predictor display | Highest-impact UX change |
+| **12** | 5.1 | Fix onboarding (user discovers, not watches) | Entry point fix |
+| **13** | 0.4 | Declarative input routing | Needed before quiz overhaul |
+| **14** | 5.2-5.4 | Micro-quizzes, SRS, progressive quiz | Learning system overhaul |
+| **15** | 6.1-6.4 | Universal actions, cross-view recording, persistence | Connective tissue |
+| **16** | 2.2-2.3 | Editable columns, color input | Direct manipulation |
+| **17** | 7.1-7.3 | Audio improvements | Polish |
+| **18** | 1.3-1.4 | Context panel morphing, view transitions | Visual polish |
+| **19** | 4.2-4.3 | Predictor-sunburst fusion, dead-end creativity | Advanced features |
+| **20** | 8.1-8.3 | Trie search, swipe, accessibility | Final polish |
+
+---
+
+## What Stays (v3 Strengths)
+
+- Vanilla JS + Vite, zero runtime dependencies
+- `SolresolWord` observable model with mutations
+- Event bus (14-line `events.js`)
+- Web Audio ADSR synth + Web MIDI input
+- 4-view architecture (Play, Dictionary, Translate, Learn)
+- Sunburst, sequencer, word predictor, context panel
+- Onboarding flow (revised, not replaced)
+- Dark theme, responsive CSS
 - Dictionary data (3,152 entries)
+- Trie-based prediction
+- Mirror ghost + flip animation
+- Persistent sentence bar with localStorage
 
-## What Changes (v2 → v3)
+## What Changes (v3 → v4)
 
-| v2 | v3 |
+| v3 | v4 |
 |----|-----|
-| Keyboard shows color blocks while building | Keyboard shows predictive word fan — the meaning landscape |
-| 7 notation systems are display-only | Each notation is a live input (click/drag/draw to edit) |
-| Antonym reversal in dictionary sub-tab | Mirror ghost on every word, flip animation, swipe-to-reverse |
-| 4 separate views with full page navigation | Unified workspace with persistent sentence bar |
-| Quiz: stimulus → multiple choice → score | Progressive discovery: observe patterns → form hypotheses → test |
-| Landing page: empty Play view | Guided first experience: hear melody → realize it's a word |
-| `translate()` returns null for unknown words | Every word "exists" — undefined words get structural analysis |
-| Grammar rules described as prose | Grammar rules are active computation: stress changes POS live |
-| Compositions vanish on navigation | Sentence bar persists, compositions saveable |
-| No personal vocabulary | Star words, propose definitions, spaced repetition by concept |
+| `focusWord` = input buffer + inspection target | `buildingWord` + `inspectedWord` (independent) |
+| `captureKeyboard` / `releaseKeyboard` mutex | Priority-based input handler stack |
+| `innerHTML = ''` + full rebuild on every change | Incremental DOM updates, persistent elements |
+| Manual `destroy()` / null-check pattern x12 | `managed()` lifecycle scope, automatic cleanup |
+| `committedWords` = plain array | `SolresolSentence` object with grammar awareness |
+| `buildSentence()` = string concatenation | Grammar computation: role detection, suggestions, validation |
+| Representations in separate rows (7 views of 1 thing) | Column-as-object (1 thing that is 7 views) |
+| Predictor in tiny keyboard bar | Predictor expands to fill main area during word-building |
+| Sequencer creates own AudioContext | Sequencer uses shared synth module |
+| capitalize() inline x5 | `displaySyllable()` canonical utility |
+| Quiz: 5 random-choice modes | Progressive discovery + micro-quizzes + spaced repetition |
+| Onboarding: watch DoReMi play | Onboarding: play your own notes, discover they have meaning |
+| Views are isolated rooms | Universal word actions, cross-view recording, deep links |
+| No personal vocabulary | Star words, propose definitions, SRS-driven review |
+| Audio: flat gain for all syllables | Stress-aware gain + duration, optional reverb |
+| Sentence bar: display-only chips | Draggable, grammar-colored, role-labeled, manageable |
 
 ---
 
-## The Goal (in their words)
+## The North Star
 
-**Victor:** "Every representation of a word becomes simultaneously visible and directly
-manipulable. You don't read about Solresol — you play it, see it, flip it, hear it change."
+**Victor:** "I should not be able to tell where the color block ends and the
+sound begins. The column IS the syllable — it is simultaneously red, Do, 261 Hz,
+001, and ⠁. When I drag it, all of those change. When I hear it, all of those
+light up."
 
-**Kay:** "The site stops being a website about Solresol and becomes a medium for Solresol.
-The dictionary is a space to explore. The grammar is a machine to operate. The quiz is a
-game that teaches through structure. The seven representations are always present, always linked."
+**Kay:** "A `SolresolSentence` should be as real as a `SolresolWord`. It should
+know its own grammar, suggest what's missing, validate its structure, and persist
+across sessions. The site should remember what you've learned and teach you what
+you haven't — not through a quiz tab, but through the texture of everyday use."

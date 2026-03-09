@@ -4,12 +4,14 @@ import { createNotationToggles } from './notation-display.js';
 import { getAntonym } from '../utils/antonyms.js';
 import { SEMANTIC_CATEGORIES } from '../utils/grammar.js';
 import { translate } from '../utils/solresol.js';
-import { setFocusWord } from '../state/focus-word.js';
-import { on } from '../utils/events.js';
+import { inspectWord, currentSentence } from '../state/focus-word.js';
+import { on, emit } from '../utils/events.js';
+import { isStarred, toggleStar } from '../state/vocabulary.js';
 import { shareWordCard } from './word-card-export.js';
+import { managed } from '../utils/lifecycle.js';
 
 let panelEl = null;
-let currentRenderer = null;
+const panelScope = managed();
 const STORAGE_KEY = 'solresol:notations';
 const HISTORY_KEY = 'solresol:history';
 const MAX_HISTORY = 12;
@@ -44,6 +46,19 @@ function addToHistory(text) {
   if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}
 }
+
+// Persistent panel DOM refs — survive between word switches
+let displayWord = null;
+let currentRenderer = null;
+let catEl = null;
+let antEl = null;
+let actionsEl = null;
+let stressEl = null;
+let togglesEl = null;
+let histEl = null;
+let addBtn = null;
+let starBtn = null;
+let shareBtn = null;
 
 /**
  * Initialize the context panel — a slide-in drawer showing everything about the focus word.
@@ -84,14 +99,28 @@ export function initContextPanel(container) {
 
 function showWord(word) {
   const content = panelEl.querySelector('#cp-content');
+
+  // If panel already has structure, morph in place instead of rebuilding
+  if (displayWord && currentRenderer) {
+    morphToWord(word);
+  } else {
+    buildPanel(content, word);
+  }
+
+  openPanel();
+}
+
+/**
+ * Build the panel DOM from scratch (first time only).
+ */
+function buildPanel(content, word) {
   content.innerHTML = '';
-  if (currentRenderer) { currentRenderer.destroy(); currentRenderer = null; }
+  panelScope.destroyAll();
 
-  // Create a copy so we don't mutate the focus word
-  const displayWord = new SolresolWord(word.syllables);
+  displayWord = new SolresolWord(word.syllables);
 
-  // Word renderer with full notations, mirror, and stress
-  currentRenderer = createWordRenderer(displayWord, {
+  // Word renderer
+  currentRenderer = panelScope.track(createWordRenderer(displayWord, {
     size: 'lg',
     showSheet: true,
     showDefinition: true,
@@ -101,42 +130,35 @@ function showWord(word) {
     reactive: true,
     notations: activeNotations,
     clickToFocus: false,
-  });
+  }));
   content.appendChild(currentRenderer.el);
 
-  // Semantic category
-  const cat = displayWord.category;
-  if (cat) {
-    const catEl = document.createElement('div');
-    catEl.className = 'cp-meta';
-    catEl.innerHTML = `<span class="cp-meta-label">Category:</span> <span style="color:${cat.color}">${cat.label}</span>`;
-    catEl.style.cursor = 'pointer';
-    catEl.title = 'View in Dictionary by category';
-    catEl.addEventListener('click', () => {
-      // Navigate to dictionary with category filter
-      window.location.hash = `dictionary?start=${displayWord.syllables[0]}`;
-      closePanel();
-    });
-    content.appendChild(catEl);
-  }
+  // Category
+  catEl = document.createElement('div');
+  catEl.className = 'cp-meta';
+  catEl.style.cursor = 'pointer';
+  catEl.title = 'View in Dictionary by category';
+  catEl.addEventListener('click', () => {
+    window.location.hash = `dictionary?start=${displayWord.syllables[0]}`;
+    closePanel();
+  });
+  content.appendChild(catEl);
+  updateCategory();
 
   // Antonym
-  const antonym = displayWord.antonym;
-  if (antonym) {
-    const antDef = translate(antonym);
-    const antEl = document.createElement('div');
-    antEl.className = 'cp-meta cp-meta--clickable';
-    antEl.innerHTML = `<span class="cp-meta-label">Antonym:</span> <strong>${antonym}</strong>${antDef ? ' — ' + antDef : ''}`;
-    antEl.title = 'Focus on antonym';
-    antEl.addEventListener('click', () => {
-      setFocusWord(antonym);
-    });
-    content.appendChild(antEl);
-  }
+  antEl = document.createElement('div');
+  antEl.className = 'cp-meta cp-meta--clickable';
+  antEl.title = 'Focus on antonym';
+  antEl.addEventListener('click', () => {
+    const ant = displayWord.antonym;
+    if (ant) inspectWord(ant);
+  });
+  content.appendChild(antEl);
+  updateAntonym();
 
-  // Actions
-  const actions = document.createElement('div');
-  actions.className = 'cp-actions';
+  // Actions bar
+  actionsEl = document.createElement('div');
+  actionsEl.className = 'cp-actions';
 
   const dictBtn = document.createElement('button');
   dictBtn.className = 'btn btn--sm';
@@ -146,22 +168,19 @@ function showWord(word) {
     window.location.hash = `dictionary?word=${displayWord.text.toLowerCase()}`;
     closePanel();
   });
-  actions.appendChild(dictBtn);
+  actionsEl.appendChild(dictBtn);
 
-  // Sunburst deep link
-  if (displayWord.syllables.length > 0) {
-    const sunBtn = document.createElement('button');
-    sunBtn.className = 'btn btn--sm';
-    sunBtn.textContent = 'Sunburst';
-    sunBtn.title = 'Show on Sunburst';
-    sunBtn.addEventListener('click', () => {
-      window.location.hash = `dictionary?mode=sunburst&zoom=${displayWord.syllables[0]}`;
-      closePanel();
-    });
-    actions.appendChild(sunBtn);
-  }
+  const sunBtn = document.createElement('button');
+  sunBtn.className = 'btn btn--sm';
+  sunBtn.textContent = 'Sunburst';
+  sunBtn.title = 'Show on Sunburst';
+  sunBtn.addEventListener('click', () => {
+    window.location.hash = `dictionary?mode=sunburst&zoom=${displayWord.syllables[0]}`;
+    closePanel();
+  });
+  actionsEl.appendChild(sunBtn);
 
-  const shareBtn = document.createElement('button');
+  shareBtn = document.createElement('button');
   shareBtn.className = 'btn btn--sm';
   shareBtn.textContent = 'Share';
   shareBtn.title = 'Share word card';
@@ -175,71 +194,167 @@ function showWord(word) {
       shareBtn.disabled = false;
     }, 2000);
   });
-  actions.appendChild(shareBtn);
+  actionsEl.appendChild(shareBtn);
 
-  content.appendChild(actions);
+  addBtn = document.createElement('button');
+  addBtn.className = 'btn btn--sm';
+  addBtn.textContent = 'Add to Sentence';
+  addBtn.title = 'Add this word to the current sentence';
+  addBtn.addEventListener('click', () => {
+    currentSentence.addWord(displayWord);
+    emit('word:commit', { word: displayWord });
+    addBtn.textContent = 'Added!';
+    addBtn.disabled = true;
+    setTimeout(() => {
+      addBtn.textContent = 'Add to Sentence';
+      addBtn.disabled = false;
+    }, 1500);
+  });
+  actionsEl.appendChild(addBtn);
 
-  // Stress / Part of Speech toggles
-  if (displayWord.length >= 2) {
-    const stressEl = document.createElement('div');
-    stressEl.className = 'cp-meta';
-    stressEl.innerHTML = '<span class="cp-meta-label">Stress:</span> ';
+  starBtn = document.createElement('button');
+  starBtn.className = 'btn btn--sm';
+  starBtn.title = 'Toggle starred';
+  starBtn.addEventListener('click', () => {
+    const nowStarred = toggleStar(displayWord.text);
+    starBtn.textContent = nowStarred ? '\u2605 Starred' : '\u2606 Star';
+  });
+  actionsEl.appendChild(starBtn);
+  updateStar();
 
-    const stressOpts = [
-      { value: null, label: 'None (noun)' },
-      { value: 'last', label: 'Last (adj.)' },
-      { value: 'penultimate', label: 'Penult. (verb)' },
-    ];
-    if (displayWord.length >= 3) {
-      stressOpts.push({ value: 'antepenultimate', label: 'Antepenult. (adv.)' });
-    }
+  content.appendChild(actionsEl);
 
-    for (const opt of stressOpts) {
-      const btn = document.createElement('button');
-      btn.className = 'btn btn--sm';
-      btn.style.marginLeft = '4px';
-      btn.textContent = opt.label;
-      if (displayWord.stressPosition === opt.value) btn.classList.add('btn--active');
-      btn.addEventListener('click', () => {
-        displayWord.stressPosition = opt.value;
-        // Update active state
-        stressEl.querySelectorAll('.btn').forEach(b => b.classList.remove('btn--active'));
-        btn.classList.add('btn--active');
-      });
-      stressEl.appendChild(btn);
-    }
-    content.appendChild(stressEl);
-  }
+  // Stress toggles
+  stressEl = document.createElement('div');
+  stressEl.className = 'cp-meta';
+  content.appendChild(stressEl);
+  buildStressToggles();
 
   // Notation toggles
-  const toggles = createNotationToggles(activeNotations, (updated) => {
+  togglesEl = createNotationToggles(activeNotations, (updated) => {
     activeNotations = updated;
     saveNotations(activeNotations);
     if (currentRenderer) currentRenderer.rerender();
   });
-  content.appendChild(toggles);
+  content.appendChild(togglesEl);
 
-  // Word history
-  addToHistory(displayWord.text);
-  const history = getHistory().filter(w => w !== displayWord.text);
-  if (history.length > 0) {
-    const histEl = document.createElement('div');
-    histEl.className = 'cp-history';
-    histEl.innerHTML = '<span class="cp-meta-label">Recent:</span>';
-    const list = document.createElement('div');
-    list.className = 'cp-history-list';
-    for (const w of history.slice(0, 8)) {
-      const chip = document.createElement('button');
-      chip.className = 'btn btn--sm cp-history-chip';
-      chip.textContent = w;
-      chip.addEventListener('click', () => setFocusWord(w));
-      list.appendChild(chip);
-    }
-    histEl.appendChild(list);
-    content.appendChild(histEl);
+  // History
+  histEl = document.createElement('div');
+  histEl.className = 'cp-history';
+  content.appendChild(histEl);
+  updateHistory();
+}
+
+/**
+ * Morph the panel to show a different word — update in place, no DOM rebuild.
+ */
+function morphToWord(word) {
+  // Update the display word
+  displayWord.set(word.syllables);
+
+  // Update sections that depend on word identity
+  updateCategory();
+  updateAntonym();
+  updateStar();
+  updateHistory();
+  buildStressToggles();
+
+  // Reset action button states
+  if (addBtn) {
+    addBtn.textContent = 'Add to Sentence';
+    addBtn.disabled = false;
+  }
+  if (shareBtn) {
+    shareBtn.textContent = 'Share';
+    shareBtn.disabled = false;
+  }
+}
+
+function updateCategory() {
+  if (!catEl || !displayWord) return;
+  const cat = displayWord.category;
+  if (cat) {
+    catEl.innerHTML = `<span class="cp-meta-label">Category:</span> <span style="color:${cat.color}">${cat.label}</span>`;
+    catEl.style.display = '';
+  } else {
+    catEl.style.display = 'none';
+  }
+}
+
+function updateAntonym() {
+  if (!antEl || !displayWord) return;
+  const antonym = displayWord.antonym;
+  if (antonym) {
+    const antDef = translate(antonym);
+    antEl.innerHTML = `<span class="cp-meta-label">Antonym:</span> <strong>${antonym}</strong>${antDef ? ' \u2014 ' + antDef : ''}`;
+    antEl.style.display = '';
+  } else {
+    antEl.style.display = 'none';
+  }
+}
+
+function updateStar() {
+  if (!starBtn || !displayWord) return;
+  starBtn.textContent = isStarred(displayWord.text) ? '\u2605 Starred' : '\u2606 Star';
+}
+
+function buildStressToggles() {
+  if (!stressEl || !displayWord) return;
+  stressEl.innerHTML = '';
+
+  if (displayWord.length < 2) {
+    stressEl.style.display = 'none';
+    return;
+  }
+  stressEl.style.display = '';
+  stressEl.innerHTML = '<span class="cp-meta-label">Stress:</span> ';
+
+  const stressOpts = [
+    { value: null, label: 'None (noun)' },
+    { value: 'last', label: 'Last (adj.)' },
+    { value: 'penultimate', label: 'Penult. (verb)' },
+  ];
+  if (displayWord.length >= 3) {
+    stressOpts.push({ value: 'antepenultimate', label: 'Antepenult. (adv.)' });
   }
 
-  openPanel();
+  for (const opt of stressOpts) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn--sm';
+    btn.style.marginLeft = '4px';
+    btn.textContent = opt.label;
+    if (displayWord.stressPosition === opt.value) btn.classList.add('btn--active');
+    btn.addEventListener('click', () => {
+      displayWord.stressPosition = opt.value;
+      stressEl.querySelectorAll('.btn').forEach(b => b.classList.remove('btn--active'));
+      btn.classList.add('btn--active');
+    });
+    stressEl.appendChild(btn);
+  }
+}
+
+function updateHistory() {
+  if (!histEl || !displayWord) return;
+  addToHistory(displayWord.text);
+  const history = getHistory().filter(w => w !== displayWord.text);
+
+  histEl.innerHTML = '';
+  if (history.length === 0) {
+    histEl.style.display = 'none';
+    return;
+  }
+  histEl.style.display = '';
+  histEl.innerHTML = '<span class="cp-meta-label">Recent:</span>';
+  const list = document.createElement('div');
+  list.className = 'cp-history-list';
+  for (const w of history.slice(0, 8)) {
+    const chip = document.createElement('button');
+    chip.className = 'btn btn--sm cp-history-chip';
+    chip.textContent = w;
+    chip.addEventListener('click', () => inspectWord(w));
+    list.appendChild(chip);
+  }
+  histEl.appendChild(list);
 }
 
 function openPanel() {

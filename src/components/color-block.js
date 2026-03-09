@@ -1,5 +1,6 @@
 import { getColor } from '../utils/solresol.js';
 import { playNote, playWord } from '../audio/synth.js';
+import { displaySyllable } from '../utils/format.js';
 
 /**
  * Render a single syllable as a colored block.
@@ -19,7 +20,7 @@ export function createBlock(syllable, opts = {}) {
 
   const syl = syllable.toLowerCase();
   const labels = [];
-  if (showLabel) labels.push(syl.charAt(0).toUpperCase() + syl.slice(1));
+  if (showLabel) labels.push(displaySyllable(syl));
   if (showNumber) {
     const n = ['do','re','mi','fa','sol','la','si'].indexOf(syl) + 1;
     labels.push(n);

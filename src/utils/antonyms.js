@@ -1,4 +1,5 @@
 import { parseWord, translate } from './solresol.js';
+import { displayWord } from './format.js';
 
 /**
  * Known antonym pairs formed by syllable reversal.
@@ -56,7 +57,7 @@ export function getAntonym(word) {
   const syls = parseWord(word);
   if (syls.length >= 2) {
     const reversed = [...syls].reverse();
-    const reversedWord = reversed.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const reversedWord = displayWord(reversed);
     const def = translate(reversedWord);
     if (def) return reversedWord;
   }

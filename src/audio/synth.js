@@ -17,6 +17,57 @@ function getContext() {
   return audioCtx;
 }
 
+export { getContext };
+
+// --------------- Reverb ---------------
+
+let reverbEnabled = false;
+let reverbNodes = null;
+
+export function setReverb(enabled) {
+  reverbEnabled = enabled;
+}
+
+export function isReverbEnabled() {
+  return reverbEnabled;
+}
+
+/**
+ * Create (or return cached) reverb effect nodes for the current AudioContext.
+ * Chain: input → delay → feedbackGain → destination  (wet path)
+ *        input → destination                          (dry path)
+ * @returns {{ input: GainNode }}
+ */
+function getReverbChain(ctx) {
+  if (reverbNodes && reverbNodes.ctx === ctx) return reverbNodes;
+
+  const input = ctx.createGain();     // entry point for wet/dry routing
+  const delay = ctx.createDelay(1.0);
+  const feedback = ctx.createGain();
+  const wet = ctx.createGain();
+
+  delay.delayTime.value = 0.1;
+  feedback.gain.value = 0.3;
+  wet.gain.value = 0.4;  // wet mix level
+
+  // feedback loop: delay → feedback → delay
+  delay.connect(feedback);
+  feedback.connect(delay);
+
+  // wet path: input → delay → wet → destination
+  input.connect(delay);
+  delay.connect(wet);
+  wet.connect(ctx.destination);
+
+  // dry path: input → destination
+  input.connect(ctx.destination);
+
+  reverbNodes = { ctx, input };
+  return reverbNodes;
+}
+
+// --------------- playNote ---------------
+
 /**
  * Play a single note
  * @param {string} syllable - e.g. 'do', 're'
@@ -54,34 +105,51 @@ export function playNote(syllable, opts = {}) {
   gainNode.gain.linearRampToValueAtTime(0, startTime + duration);        // release
 
   osc.connect(gainNode);
-  gainNode.connect(ctx.destination);
+
+  if (reverbEnabled) {
+    const reverb = getReverbChain(ctx);
+    gainNode.connect(reverb.input);
+  } else {
+    gainNode.connect(ctx.destination);
+  }
 
   osc.start(startTime);
   osc.stop(startTime + duration);
 }
 
+// --------------- playWord ---------------
+
 /**
  * Play a sequence of syllables
  * @param {string[]} syllables - array of syllable strings
- * @param {object} opts - same as playNote plus tempo
+ * @param {object} opts - same as playNote plus tempo and stressIndex
  * @param {number} opts.tempo - notes per second (default 2.5, clamped 0.1–10)
+ * @param {number} opts.stressIndex - index of stressed syllable (-1 = none)
  */
 export function playWord(syllables, opts = {}) {
   const ctx = getContext();
   if (!ctx) return;
 
-  const { tempo = 2.5, ...noteOpts } = opts;
+  const { tempo = 2.5, stressIndex = -1, ...noteOpts } = opts;
   const safeTempo = Math.max(0.1, Math.min(10, tempo || 2.5));
   const interval = 1 / safeTempo;
+  let offset = 0;
 
   syllables.forEach((syl, i) => {
+    const isStressed = i === stressIndex;
+    const dur = isStressed ? interval * 0.9 * 1.3 : interval * 0.9;
+    const g = isStressed ? (noteOpts.gain || 0.3) * 1.5 : noteOpts.gain;
     playNote(syl, {
       ...noteOpts,
-      duration: interval * 0.9,
-      startTime: ctx.currentTime + i * interval,
+      duration: dur,
+      gain: g,
+      startTime: ctx.currentTime + offset,
     });
+    offset += isStressed ? interval * 1.3 : interval;
   });
 }
+
+// --------------- playSentence ---------------
 
 /**
  * Play multiple words as a sentence with pauses between words.

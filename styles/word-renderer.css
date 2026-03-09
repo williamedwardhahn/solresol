@@ -180,6 +180,15 @@
   margin: 0 2px;
 }
 
+/* Column enter animation */
+.wr-col--entering {
+  animation: wr-slide-in 0.15s ease-out;
+}
+@keyframes wr-slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Flip animation */
 .wr-row--colors.wr-flipping .wr-block {
   transition: transform 0.4s ease-in-out;

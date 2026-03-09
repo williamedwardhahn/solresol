@@ -3,8 +3,9 @@ import { playNote, playWord } from '../audio/synth.js';
 import { getColor, translate } from '../utils/solresol.js';
 import { SolresolWord } from '../models/word.js';
 import { createWordRenderer } from './word-renderer.js';
-import { focusWord, commitFocusWord } from '../state/focus-word.js';
+import { buildingWord, commitBuildingWord } from '../state/focus-word.js';
 import { on } from '../utils/events.js';
+import { displaySyllable } from '../utils/format.js';
 
 const ONBOARD_KEY = 'solresol:onboarded';
 
@@ -33,91 +34,38 @@ export function renderOnboarding(container, onComplete) {
   skipBtn.addEventListener('click', finish);
 
   const steps = [
-    // Step 0: Welcome — click unlocks AudioContext
+    // Step 0: Welcome — click unlocks AudioContext, then user plays immediately
     () => {
       stage.innerHTML = `
         <h2 class="onboard-title">Welcome to Solresol</h2>
         <p class="onboard-subtitle">A language made entirely of music</p>
-        <button class="btn btn--lg onboard-play-btn" id="onboard-begin">&#9654; Listen</button>
+        <p class="onboard-hint">Press any three keys: <kbd>1</kbd>\u2013<kbd>7</kbd> on your keyboard, or use the colored keys above</p>
+        <button class="btn btn--sm onboard-play-btn" id="onboard-unlock" style="opacity:0.5">or click here to enable audio first</button>
+        <div id="onboard-live" style="min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:1rem 0"></div>
+        <p class="onboard-hint" id="onboard-hint" style="min-height:1.5em"></p>
       `;
-      stage.querySelector('#onboard-begin').addEventListener('click', nextStep);
-    },
 
-    // Step 1: Auto-play melody in sync with blocks (audio already unlocked)
-    () => {
-      stage.innerHTML = `
-        <h2 class="onboard-title">Listen to this melody</h2>
-        <div class="onboard-blocks" id="onboard-blocks"></div>
-        <p class="onboard-subtitle" id="onboard-sub" style="opacity:0">That was a <em>word</em>.</p>
-      `;
-      const blocksEl = stage.querySelector('#onboard-blocks');
-      const subEl = stage.querySelector('#onboard-sub');
-      const word = ['do', 're', 'mi'];
-
-      let i = 0;
-      const interval = setInterval(() => {
-        if (i >= word.length) {
-          clearInterval(interval);
-          setTimeout(() => {
-            subEl.style.opacity = '1';
-            subEl.style.transition = 'opacity 0.6s';
-            const def = translate('Doremi');
-            if (def) {
-              const defEl = document.createElement('p');
-              defEl.className = 'onboard-def';
-              defEl.textContent = `"DoReMi" means: ${def}`;
-              stage.appendChild(defEl);
-            }
-            setTimeout(() => {
-              const nextBtn = document.createElement('button');
-              nextBtn.className = 'btn onboard-next';
-              nextBtn.textContent = 'Next \u2192';
-              nextBtn.addEventListener('click', nextStep);
-              stage.appendChild(nextBtn);
-            }, 800);
-          }, 600);
-          return;
-        }
-
-        const syl = word[i];
-        playNote(syl, { duration: 0.5 });
-
-        const block = document.createElement('div');
-        block.className = 'onboard-block';
-        block.style.backgroundColor = getColor(syl);
-        block.textContent = syl.charAt(0).toUpperCase() + syl.slice(1);
-        block.style.animation = 'onboard-pop 0.3s ease-out';
-        blocksEl.appendChild(block);
-
-        i++;
-      }, 500);
-
-      cleanup = () => clearInterval(interval);
-    },
-
-    // Step 1: Now you play
-    () => {
-      stage.innerHTML = `
-        <h2 class="onboard-title">Now you play</h2>
-        <p class="onboard-subtitle">Press keys <kbd>1</kbd>\u2013<kbd>7</kbd> on your keyboard, or use the colored keys above</p>
-        <div id="onboard-live" style="min-height:80px;display:flex;align-items:center;justify-content:center;margin:1rem 0"></div>
-        <p class="onboard-hint" id="onboard-hint">Try pressing a few notes...</p>
-      `;
+      // Silent click to unlock AudioContext
+      stage.querySelector('#onboard-unlock').addEventListener('click', () => {
+        playNote('do', { duration: 0.01, gain: 0 });
+        stage.querySelector('#onboard-unlock').style.display = 'none';
+      });
 
       const liveEl = stage.querySelector('#onboard-live');
       const hintEl = stage.querySelector('#onboard-hint');
       let renderer = null;
       let noteCount = 0;
+      let revealed = false;
 
-      const unsub = focusWord.onChange(() => {
+      const unsub = buildingWord.onChange(() => {
         if (renderer) renderer.destroy();
         liveEl.innerHTML = '';
-        if (focusWord.isEmpty) return;
+        if (buildingWord.isEmpty) return;
 
-        renderer = createWordRenderer(focusWord, {
+        renderer = createWordRenderer(buildingWord, {
           size: 'lg',
           showSheet: false,
-          showDefinition: true,
+          showDefinition: false, // don't show yet — reveal it
           showMirror: false,
           reactive: false,
           notations: new Set(['colors']),
@@ -129,24 +77,95 @@ export function renderOnboarding(container, onComplete) {
       const unsubPlay = on('syllable:play', () => {
         noteCount++;
         if (noteCount === 1) hintEl.textContent = 'Keep going...';
-        if (noteCount >= 3) {
-          hintEl.textContent = 'Every combination of notes is a word!';
-          if (!stage.querySelector('.onboard-next')) {
-            setTimeout(() => {
+        if (noteCount === 2) hintEl.textContent = 'One more...';
+        if (noteCount >= 3 && !revealed) {
+          revealed = true;
+          // Reveal: the notes they played ARE a word
+          const def = buildingWord.definition;
+          const text = buildingWord.text;
+
+          if (def) {
+            hintEl.innerHTML = `You just played <strong>${text}</strong> \u2014 it means: <em>"${def}"</em>`;
+          } else {
+            hintEl.innerHTML = `You played <strong>${text}</strong> \u2014 a valid Solresol word! Not all are in the dictionary yet.`;
+          }
+          hintEl.style.transition = 'color 0.3s';
+          hintEl.style.color = 'var(--accent)';
+
+          setTimeout(() => {
+            if (!stage.querySelector('.onboard-next')) {
               const nextBtn = document.createElement('button');
               nextBtn.className = 'btn onboard-next';
               nextBtn.textContent = 'Next \u2192';
               nextBtn.addEventListener('click', nextStep);
               stage.appendChild(nextBtn);
-            }, 600);
-          }
+            }
+          }, 1200);
         }
       });
 
       cleanup = () => { unsub(); unsubPlay(); if (renderer) renderer.destroy(); };
     },
 
-    // Step 2: Seven representations
+    // Step 1: Play more — every combination is a word
+    () => {
+      // Clear building word so they start fresh
+      buildingWord.clear();
+
+      stage.innerHTML = `
+        <h2 class="onboard-title">Every combination is a word</h2>
+        <p class="onboard-subtitle">Try different notes \u2014 watch the meaning change</p>
+        <div id="onboard-live" style="min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:1rem 0"></div>
+        <p class="onboard-hint" id="onboard-hint"></p>
+      `;
+
+      const liveEl = stage.querySelector('#onboard-live');
+      const hintEl = stage.querySelector('#onboard-hint');
+      let renderer = null;
+      let wordsPlayed = 0;
+
+      const unsub = buildingWord.onChange(() => {
+        if (renderer) renderer.destroy();
+        liveEl.innerHTML = '';
+        if (buildingWord.isEmpty) return;
+
+        renderer = createWordRenderer(buildingWord, {
+          size: 'lg',
+          showSheet: false,
+          showDefinition: true,
+          showMirror: false,
+          reactive: false,
+          notations: new Set(['colors']),
+          clickToFocus: false,
+        });
+        liveEl.appendChild(renderer.el);
+      });
+
+      const unsubCommit = on('word:commit', () => {
+        wordsPlayed++;
+        if (wordsPlayed === 1) hintEl.textContent = 'Press Enter to commit, then play another!';
+        if (wordsPlayed >= 2 && !stage.querySelector('.onboard-next')) {
+          hintEl.textContent = '7 notes, 3,152 words \u2014 a whole language from music.';
+          setTimeout(() => {
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'btn onboard-next';
+            nextBtn.textContent = 'Next \u2192';
+            nextBtn.addEventListener('click', nextStep);
+            stage.appendChild(nextBtn);
+          }, 600);
+        }
+      });
+
+      const unsubPlay = on('syllable:play', () => {
+        if (wordsPlayed === 0 && buildingWord.length >= 2) {
+          hintEl.textContent = 'Press Enter to commit this word, then try another combination.';
+        }
+      });
+
+      cleanup = () => { unsub(); unsubCommit(); unsubPlay(); if (renderer) renderer.destroy(); };
+    },
+
+    // Step 2: Seven representations + antonym flip
     () => {
       stage.innerHTML = `
         <h2 class="onboard-title">Colors are sounds are numbers</h2>

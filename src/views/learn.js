@@ -5,10 +5,13 @@ import { SolresolWord } from '../models/word.js';
 import { createWordRenderer } from '../components/word-renderer.js';
 import { playNote, playWord } from '../audio/synth.js';
 import { getSyllableNotations } from '../utils/notation.js';
-import { SEMANTIC_CATEGORIES, getSemanticCategory } from '../utils/grammar.js';
+import { SEMANTIC_CATEGORIES, getSemanticCategory, STRESS_RULES, stressParams } from '../utils/grammar.js';
 import { getAntonym } from '../utils/antonyms.js';
 import { captureKeyboard, releaseKeyboard } from '../components/global-keyboard.js';
-import { setFocusWord } from '../state/focus-word.js';
+import { inspectWord } from '../state/focus-word.js';
+import { managed } from '../utils/lifecycle.js';
+import { displaySyllable } from '../utils/format.js';
+import { recordQuizResult, recordEncounter, getWeakConcepts, getStats } from '../utils/srs.js';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -173,7 +176,7 @@ export function renderLearn(container) {
 
       card.innerHTML = `
         <div class="ref-note-name" style="color: ${getColor(note)}">
-          ${note.charAt(0).toUpperCase() + note.slice(1)}
+          ${displaySyllable(note)}
         </div>
         <div class="ref-note-detail">Number: ${num}</div>
         <div class="ref-note-detail">${freq} Hz</div>
@@ -197,11 +200,11 @@ export function renderLearn(container) {
     // --- Live communication modes demo ---
     const modesInput = el.querySelector('#ref-modes-input');
     const modesDemo = el.querySelector('#ref-modes-demo');
-    let modesRenderer = null;
+    const modesScope = managed();
 
     function updateModes() {
       modesDemo.innerHTML = '';
-      if (modesRenderer) { modesRenderer.destroy(); modesRenderer = null; }
+      modesScope.destroyAll();
 
       const q = modesInput.value.trim();
       if (!q) return;
@@ -210,7 +213,7 @@ export function renderLearn(container) {
       if (syls.length === 0) return;
 
       const word = new SolresolWord(syls);
-      modesRenderer = createWordRenderer(word, {
+      const modesRenderer = modesScope.track(createWordRenderer(word, {
         size: 'lg',
         showSheet: true,
         showDefinition: true,
@@ -218,7 +221,7 @@ export function renderLearn(container) {
         reactive: true,
         clickToFocus: true,
         notations: new Set(['colors', 'solfege', 'numbers', 'binary', 'braille', 'ascii', 'sauso']),
-      });
+      }));
       modesDemo.appendChild(modesRenderer.el);
     }
 
@@ -247,15 +250,65 @@ export function renderLearn(container) {
   }
 
   function renderQuiz(el, onCapture) {
+    // --- Progression state ---
+    const PROGRESS_KEY = 'solresol:quiz-progress';
+    const LEVELS = [
+      { key: 'level1', label: 'Ear Training', qmode: 'note' },
+      { key: 'level2', label: 'Pattern Discovery', qmode: 'category' },
+      { key: 'level3', label: 'Symmetry Discovery', qmode: 'antonym' },
+      { key: 'level4', label: 'Grammar Discovery', qmode: 'stress' },
+      { key: 'level5', label: 'Composition', qmode: 'translate' },
+    ];
+    const UNLOCK_THRESHOLD = 10;
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem(PROGRESS_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (_) { /* ignore */ }
+      return { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
+    }
+
+    function saveProgress(progress) {
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (_) { /* ignore */ }
+    }
+
+    function isUnlocked(levelIdx) {
+      if (levelIdx === 0) return true;
+      const progress = loadProgress();
+      const prevKey = LEVELS[levelIdx - 1].key;
+      return (progress[prevKey] || 0) >= UNLOCK_THRESHOLD;
+    }
+
+    function recordLevelCorrect(levelIdx) {
+      const progress = loadProgress();
+      const key = LEVELS[levelIdx].key;
+      progress[key] = (progress[key] || 0) + 1;
+      saveProgress(progress);
+    }
+
+    function srsRecord(concept, correct) {
+      try { recordQuizResult(concept, correct); } catch (_) { /* SRS not loaded */ }
+    }
+
+    function srsEncounter(wordText, context) {
+      try { recordEncounter(wordText, context); } catch (_) { /* SRS not loaded */ }
+    }
+
+    function srsGetWeakConcepts(limit) {
+      try { return getWeakConcepts(limit); } catch (_) { return []; }
+    }
+
+    function srsGetStats() {
+      try { return getStats(); } catch (_) { return { totalEncounters: 0, uniqueWords: 0, quizzesTaken: 0, accuracy: 0, streakDays: 0 }; }
+    }
+
+    // --- Build UI ---
     el.innerHTML = `
       <div class="quiz-inner">
-        <div class="quiz-mode-select">
-          <button class="btn btn--active" data-qmode="note">Ear Training</button>
-          <button class="btn" data-qmode="word">Word Building</button>
-          <button class="btn" data-qmode="category">Categories</button>
-          <button class="btn" data-qmode="antonym">Antonyms</button>
-          <button class="btn" data-qmode="translate">Translation</button>
-        </div>
+        <div class="quiz-stats" id="quiz-stats"></div>
+        <div class="quiz-progress-bar" id="quiz-progress-bar"></div>
+        <div class="quiz-mode-select" id="quiz-mode-select"></div>
         <div id="quiz-area" class="quiz-area"></div>
         <div class="quiz-score">
           Score: <span id="quiz-score">0</span> |
@@ -267,7 +320,10 @@ export function renderLearn(container) {
     const area = el.querySelector('#quiz-area');
     const scoreEl = el.querySelector('#quiz-score');
     const streakEl = el.querySelector('#quiz-streak');
-    const qmodeBtns = el.querySelectorAll('[data-qmode]');
+    const progressBar = el.querySelector('#quiz-progress-bar');
+    const modeSelect = el.querySelector('#quiz-mode-select');
+    const statsEl = el.querySelector('#quiz-stats');
+    let currentLevelIdx = 0;
     let qmode = 'note';
     let score = (() => { try { return parseInt(localStorage.getItem('solresol:quiz-score')) || 0; } catch { return 0; } })();
     let streak = 0;
@@ -276,14 +332,66 @@ export function renderLearn(container) {
     let roundTimer = null;
     let currentKeyHandler = null;
 
-    qmodeBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        qmode = btn.dataset.qmode;
-        qmodeBtns.forEach(b => b.classList.remove('btn--active'));
-        btn.classList.add('btn--active');
-        startRound();
+    function renderStats() {
+      const stats = srsGetStats();
+      statsEl.innerHTML = `
+        <span class="quiz-stat" title="Unique words encountered">Words: <strong>${stats.uniqueWords}</strong></span>
+        <span class="quiz-stat" title="Quiz accuracy">Accuracy: <strong>${Math.round(stats.accuracy * 100)}%</strong></span>
+        <span class="quiz-stat" title="Consecutive days practiced">Streak: <strong>${stats.streakDays}d</strong></span>
+      `;
+    }
+
+    function renderProgressBar() {
+      const progress = loadProgress();
+      progressBar.innerHTML = '';
+      LEVELS.forEach((lvl, idx) => {
+        const unlocked = isUnlocked(idx);
+        const count = progress[lvl.key] || 0;
+        const filled = Math.min(count, UNLOCK_THRESHOLD);
+        const star = unlocked ? '\u2605' : '\u2606';
+        const span = document.createElement('span');
+        span.className = `quiz-level-indicator${idx === currentLevelIdx ? ' active' : ''}${!unlocked ? ' locked' : ''}`;
+        span.textContent = `Level ${idx + 1} ${star}`;
+        if (unlocked && count < UNLOCK_THRESHOLD) {
+          span.textContent += ` (${filled}/${UNLOCK_THRESHOLD})`;
+        }
+        span.title = unlocked ? lvl.label : `Locked — need ${UNLOCK_THRESHOLD - (idx > 0 ? (progress[LEVELS[idx - 1].key] || 0) : 0)} more correct in Level ${idx}`;
+        progressBar.appendChild(span);
+        if (idx < LEVELS.length - 1) {
+          const sep = document.createElement('span');
+          sep.className = 'quiz-level-sep';
+          sep.textContent = ' | ';
+          progressBar.appendChild(sep);
+        }
       });
-    });
+    }
+
+    function renderModeButtons() {
+      modeSelect.innerHTML = '';
+      LEVELS.forEach((lvl, idx) => {
+        const btn = document.createElement('button');
+        const unlocked = isUnlocked(idx);
+        btn.className = `btn${idx === currentLevelIdx ? ' btn--active' : ''}`;
+        btn.dataset.qmode = lvl.qmode;
+        btn.dataset.level = idx;
+        if (!unlocked) {
+          btn.disabled = true;
+          btn.innerHTML = `<span class="quiz-lock-icon">\uD83D\uDD12</span> ${lvl.label}`;
+          btn.title = `Complete ${UNLOCK_THRESHOLD} correct answers in Level ${idx} to unlock`;
+        } else {
+          btn.textContent = lvl.label;
+        }
+        btn.addEventListener('click', () => {
+          if (!unlocked) return;
+          currentLevelIdx = idx;
+          qmode = lvl.qmode;
+          renderModeButtons();
+          renderProgressBar();
+          startRound();
+        });
+        modeSelect.appendChild(btn);
+      });
+    }
 
     function updateScore(correct) {
       if (correct) { score++; streak++; }
@@ -295,6 +403,26 @@ export function renderLearn(container) {
 
     function pickRandom(arr) {
       return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    /** Pick an entry, preferring weak concepts from SRS when available */
+    function pickWeightedEntry(entries, conceptType) {
+      const weak = srsGetWeakConcepts(10);
+      if (weak.length > 0) {
+        const weakValues = new Set(weak.filter(w => w.type === conceptType).map(w => w.value));
+        if (weakValues.size > 0) {
+          const weakEntries = entries.filter(e => {
+            const syls = parseWord(e.solresol);
+            if (conceptType === 'note') return weakValues.has(syls[0]);
+            if (conceptType === 'category') return weakValues.has(syls[0]);
+            if (conceptType === 'word') return weakValues.has(e.solresol);
+            if (conceptType === 'antonym') return weakValues.has(e.solresol);
+            return false;
+          });
+          if (weakEntries.length > 0) return pickRandom(weakEntries);
+        }
+      }
+      return pickRandom(entries);
     }
 
     function setKeyHandler(handler) {
@@ -311,10 +439,10 @@ export function renderLearn(container) {
       area.style.opacity = '0';
       setTimeout(() => {
         if (qmode === 'note') noteRound();
-        else if (qmode === 'word') wordRound();
-        else if (qmode === 'category') categoryRound();
-        else if (qmode === 'antonym') antonymRound();
-        else translateRound();
+        else if (qmode === 'category') patternDiscoveryRound();
+        else if (qmode === 'antonym') symmetryDiscoveryRound();
+        else if (qmode === 'stress') grammarDiscoveryRound();
+        else compositionRound();
         area.style.opacity = '1';
       }, 150);
     }
@@ -323,12 +451,27 @@ export function renderLearn(container) {
       roundTimer = setTimeout(startRound, delay);
     }
 
-    // --- Note Recognition ---
+    // Initialize displays
+    renderStats();
+    renderProgressBar();
+    renderModeButtons();
+
+    // =============================
+    // LEVEL 1: Ear Training (kept as-is with SRS)
+    // =============================
     function noteRound() {
-      const target = pickRandom(NOTES);
+      const weakNotes = srsGetWeakConcepts(7).filter(w => w.type === 'note');
+      let target;
+      if (weakNotes.length > 0 && Math.random() < 0.5) {
+        const weakNote = pickRandom(weakNotes);
+        target = NOTES.find(n => n === weakNote.value) || pickRandom(NOTES);
+      } else {
+        target = pickRandom(NOTES);
+      }
+
       area.innerHTML = `
         <p class="quiz-prompt">Listen and identify the note:</p>
-        <p class="quiz-hint">Press keys 1–7 or click a button</p>
+        <p class="quiz-hint">Press keys 1\u20137 or click a button</p>
         <button class="btn btn--lg" id="quiz-play-note">&#9654; Play</button>
         <div class="quiz-options" id="quiz-options"></div>
         <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
@@ -343,7 +486,7 @@ export function renderLearn(container) {
         const btn = document.createElement('button');
         btn.className = 'btn note-btn';
         btn.style.borderBottomColor = getColor(note);
-        btn.textContent = note.charAt(0).toUpperCase() + note.slice(1);
+        btn.textContent = displaySyllable(note);
         btn.addEventListener('click', () => handleAnswer(note));
         optionsEl.appendChild(btn);
       }
@@ -356,9 +499,15 @@ export function renderLearn(container) {
         answered = true;
         const correct = chosen === target;
         updateScore(correct);
+        srsRecord({ type: 'note', value: target }, correct);
+        if (correct) recordLevelCorrect(0);
+        renderProgressBar();
+        renderModeButtons();
+        renderStats();
+
         feedback.textContent = correct
           ? 'Correct!'
-          : `Wrong — it was ${target.charAt(0).toUpperCase() + target.slice(1)}`;
+          : `Wrong \u2014 it was ${displaySyllable(target)}`;
         feedback.className = `quiz-feedback ${correct ? 'correct' : 'wrong'}`;
 
         optionsEl.querySelectorAll('.note-btn').forEach(b => {
@@ -377,126 +526,71 @@ export function renderLearn(container) {
       setTimeout(() => playNote(target, { duration: 0.8 }), 300);
     }
 
-    // --- Word Building ---
-    function wordRound() {
-      const entries = getAllEntries().filter(e => e.syllables >= 2 && e.syllables <= 4 && e.definition);
-      if (entries.length === 0) {
-        area.innerHTML = '<p class="no-results">No entries available</p>';
-        return;
-      }
-      const entry = pickRandom(entries);
-      const syllables = parseWord(entry.solresol);
+    // =============================
+    // LEVEL 2: Pattern Discovery
+    // =============================
+    function patternDiscoveryRound() {
+      const entries = getAllEntries().filter(e => e.syllables >= 2 && e.definition);
+      if (entries.length < 10) { area.innerHTML = '<p class="no-results">Not enough entries</p>'; return; }
+
+      // Pick a starting note as the "trait"
+      const targetNote = pickRandom(NOTES);
+      const matchingEntries = entries.filter(e => parseWord(e.solresol)[0] === targetNote);
+      if (matchingEntries.length < 3) { area.innerHTML = '<p class="no-results">Not enough entries for this category</p>'; startRound(); return; }
+
+      // Pick 3 words that share this starting note
+      const threeWords = shuffle(matchingEntries).slice(0, 3);
+      const correctCategory = SEMANTIC_CATEGORIES[targetNote];
+
+      // Pick 2 wrong categories
+      const wrongNotes = shuffle(NOTES.filter(n => n !== targetNote)).slice(0, 2);
+      const options = shuffle([
+        { note: targetNote, label: correctCategory.label, correct: true },
+        ...wrongNotes.map(n => ({ note: n, label: SEMANTIC_CATEGORIES[n].label, correct: false })),
+      ]);
 
       area.innerHTML = `
-        <p class="quiz-prompt">Listen and build the word:</p>
-        <p class="quiz-hint">Press keys 1–7 to add notes, Enter to submit, Backspace to clear</p>
-        <button class="btn btn--lg" id="quiz-play-word">&#9654; Play</button>
-        <div class="quiz-built" id="quiz-built"></div>
-        <div class="quiz-options" id="quiz-options"></div>
-        <div class="quiz-actions">
-          <button class="btn btn--sm" id="quiz-clear">Clear</button>
-          <button class="btn btn--sm" id="quiz-submit">Submit</button>
-        </div>
+        <p class="quiz-prompt">Listen to these three words. What do they have in common?</p>
+        <div id="quiz-word-trio" class="quiz-word-trio"></div>
+        <button class="btn btn--sm" id="quiz-replay-trio">&#9654; Replay All</button>
+        <div class="quiz-options quiz-options--col" id="quiz-options" style="margin-top:0.75rem"></div>
         <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
       `;
 
-      const builtEl = area.querySelector('#quiz-built');
-      const feedback = area.querySelector('#quiz-feedback');
-      let built = [];
-      let answered = false;
-
-      area.querySelector('#quiz-play-word').addEventListener('click', () => playWord(syllables));
-      area.querySelector('#quiz-clear').addEventListener('click', () => { built = []; builtEl.innerHTML = ''; });
-
-      const optionsEl = area.querySelector('#quiz-options');
-      for (const note of NOTES) {
-        const btn = document.createElement('button');
-        btn.className = 'btn note-btn';
-        btn.style.borderBottomColor = getColor(note);
-        btn.textContent = note.charAt(0).toUpperCase() + note.slice(1);
-        btn.addEventListener('click', () => addNote(note));
-        optionsEl.appendChild(btn);
-      }
-
-      function addNote(note) {
-        if (answered) return;
-        playNote(note, { duration: 0.3 });
-        built.push(note);
-        builtEl.innerHTML = '';
-        builtEl.appendChild(createWordBlocks(built, { size: 'sm' }));
-      }
-
-      function submit() {
-        if (answered || built.length === 0) return;
-        answered = true;
-        const correct = built.length === syllables.length && built.every((s, i) => s === syllables[i]);
-        updateScore(correct);
-
+      const trioEl = area.querySelector('#quiz-word-trio');
+      const trioSyllables = [];
+      threeWords.forEach(entry => {
+        const syls = parseWord(entry.solresol);
+        trioSyllables.push(syls);
         const word = new SolresolWord(entry.solresol);
         const wr = createWordRenderer(word, {
-          size: 'md', showSheet: false, showDefinition: true, reactive: false,
+          size: 'sm', showSheet: false, showDefinition: true, reactive: false,
           clickToFocus: true,
           notations: new Set(['colors']),
         });
+        trioEl.appendChild(wr.el);
+        srsEncounter(entry.solresol, 'pattern-quiz');
+      });
 
-        feedback.textContent = correct
-          ? `Correct! "${entry.definition}"`
-          : `Wrong — it was ${entry.solresol} (${entry.definition})`;
-        feedback.className = `quiz-feedback ${correct ? 'correct' : 'wrong'}`;
-        feedback.appendChild(wr.el);
-
-        nextRound(2500);
+      // Play all three words sequentially
+      function playTrio() {
+        let delay = 0;
+        trioSyllables.forEach(syls => {
+          setTimeout(() => playWord(syls), delay);
+          delay += syls.length * 400 + 300;
+        });
       }
 
-      area.querySelector('#quiz-submit').addEventListener('click', submit);
-
-      setKeyHandler((e) => {
-        const n = Number(e.key);
-        if (n >= 1 && n <= 7) { e.preventDefault(); addNote(NOTES[n - 1]); }
-        else if (e.key === 'Enter') { e.preventDefault(); submit(); }
-        else if (e.key === 'Backspace') { e.preventDefault(); built = []; builtEl.innerHTML = ''; }
-      });
-
-      setTimeout(() => playWord(syllables), 300);
-    }
-
-    // --- Category Quiz ---
-    function categoryRound() {
-      const entries = getAllEntries().filter(e => e.syllables >= 2 && e.definition);
-      if (entries.length < 4) { area.innerHTML = '<p class="no-results">Not enough entries</p>'; return; }
-
-      const entry = pickRandom(entries);
-      const syls = parseWord(entry.solresol);
-      const correctNote = syls[0];
-      const correctCategory = SEMANTIC_CATEGORIES[correctNote];
-
-      area.innerHTML = `
-        <p class="quiz-prompt">Which semantic family does this word belong to?</p>
-        <div id="quiz-word-display" style="margin:0.75rem 0"></div>
-        <p class="quiz-hint">The first syllable determines the category</p>
-        <div class="quiz-options quiz-options--col" id="quiz-options"></div>
-        <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
-      `;
-
-      const wordDisplay = area.querySelector('#quiz-word-display');
-      const word = new SolresolWord(entry.solresol);
-      const wr = createWordRenderer(word, {
-        size: 'md', showSheet: false, showDefinition: false, reactive: false,
-        clickToFocus: true,
-        notations: new Set(['colors']),
-      });
-      wordDisplay.appendChild(wr.el);
+      area.querySelector('#quiz-replay-trio').addEventListener('click', playTrio);
 
       const optionsEl = area.querySelector('#quiz-options');
       const feedback = area.querySelector('#quiz-feedback');
       let answered = false;
 
-      const noteOrder = shuffle([...NOTES]);
-      noteOrder.forEach((note, idx) => {
-        const cat = SEMANTIC_CATEGORIES[note];
+      options.forEach((opt, idx) => {
         const btn = document.createElement('button');
         btn.className = 'btn quiz-choice';
-        btn.style.borderLeft = `4px solid ${cat.color}`;
+        btn.style.borderLeft = `4px solid ${SEMANTIC_CATEGORIES[opt.note].color}`;
         btn.style.textAlign = 'left';
 
         const numSpan = document.createElement('span');
@@ -504,74 +598,85 @@ export function renderLearn(container) {
         numSpan.textContent = idx + 1;
 
         const labelSpan = document.createElement('span');
-        labelSpan.textContent = cat.label;
+        labelSpan.textContent = opt.label;
 
         btn.append(numSpan, labelSpan);
-        btn.addEventListener('click', () => handleChoice(note, btn));
+        btn.addEventListener('click', () => handleChoice(opt, btn));
         optionsEl.appendChild(btn);
       });
 
-      function handleChoice(note, btn) {
+      function handleChoice(opt, btn) {
         if (answered) return;
         answered = true;
-        const correct = note === correctNote;
+        const correct = opt.correct;
         updateScore(correct);
+        srsRecord({ type: 'category', value: targetNote }, correct);
+        if (correct) recordLevelCorrect(1);
+        renderProgressBar();
+        renderModeButtons();
+        renderStats();
 
         if (correct) {
           btn.classList.add('btn--correct');
-          feedback.textContent = `Correct! Words starting with ${correctNote.charAt(0).toUpperCase() + correctNote.slice(1)} are in the "${correctCategory.label}" family.`;
+          feedback.textContent = `Correct! All three words start with ${displaySyllable(targetNote)} \u2014 the "${correctCategory.label}" family.`;
           feedback.className = 'quiz-feedback correct';
         } else {
           btn.classList.add('btn--wrong');
-          feedback.textContent = `Wrong — ${entry.solresol} starts with ${correctNote.charAt(0).toUpperCase() + correctNote.slice(1)}: "${correctCategory.label}"`;
+          feedback.textContent = `Wrong \u2014 they all start with ${displaySyllable(targetNote)}: "${correctCategory.label}"`;
           feedback.className = 'quiz-feedback wrong';
           optionsEl.querySelectorAll('.quiz-choice').forEach(b => {
-            if (b.querySelector('.quiz-choice-num')?.nextElementSibling?.textContent === correctCategory.label) {
-              b.classList.add('btn--correct');
-            }
+            const lbl = b.querySelector('span:nth-child(2)');
+            if (lbl && lbl.textContent === correctCategory.label) b.classList.add('btn--correct');
           });
         }
 
-        playWord(syls);
         nextRound(2500);
       }
 
       setKeyHandler((e) => {
         const n = Number(e.key);
-        if (n >= 1 && n <= noteOrder.length) {
+        if (n >= 1 && n <= options.length) {
           e.preventDefault();
-          const note = noteOrder[n - 1];
+          const opt = options[n - 1];
           const btn = optionsEl.querySelectorAll('.quiz-choice')[n - 1];
-          handleChoice(note, btn);
+          handleChoice(opt, btn);
         }
       });
+
+      setTimeout(playTrio, 300);
     }
 
-    // --- Antonym Quiz ---
-    function antonymRound() {
+    // =============================
+    // LEVEL 3: Symmetry Discovery
+    // =============================
+    function symmetryDiscoveryRound() {
       const entries = getAllEntries().filter(e => {
         if (e.syllables < 2 || !e.definition) return false;
         return getAntonym(e.solresol) !== null;
       });
       if (entries.length < 4) { area.innerHTML = '<p class="no-results">Not enough entries with antonyms</p>'; return; }
 
-      const entry = pickRandom(entries);
+      const entry = pickWeightedEntry(entries, 'antonym');
       const syls = parseWord(entry.solresol);
       const antonymWord = getAntonym(entry.solresol);
       const antonymDef = translate(antonymWord) || '?';
+      srsEncounter(entry.solresol, 'symmetry-quiz');
+
+      // Build wrong choices: 2 random definitions
+      const otherEntries = entries.filter(e => e.solresol !== entry.solresol && e.solresol !== antonymWord && e.definition);
+      const wrongDefs = shuffle(otherEntries).slice(0, 2).map(e => e.definition);
+
+      const options = shuffle([
+        { text: antonymDef, correct: true },
+        ...wrongDefs.map(d => ({ text: d, correct: false })),
+      ]);
 
       area.innerHTML = `
-        <p class="quiz-prompt">What is the antonym of this word?</p>
-        <p class="quiz-hint">Reverse the syllables to find the opposite!</p>
+        <p class="quiz-prompt">This word means "<strong>${entry.definition}</strong>":</p>
         <div id="quiz-word-display" style="margin:0.75rem 0"></div>
-        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:0.5rem">"${entry.definition}"</p>
-        <p class="quiz-hint">Play the syllables in reverse order using keys 1–7, then press Enter</p>
-        <div class="quiz-built" id="quiz-built"></div>
-        <div class="quiz-options" id="quiz-options"></div>
-        <div class="quiz-actions">
-          <button class="btn btn--sm" id="quiz-clear">Clear</button>
-          <button class="btn btn--sm" id="quiz-submit">Submit</button>
-        </div>
+        <p class="quiz-hint">Now listen to the reversed word. What happened to the meaning?</p>
+        <button class="btn btn--sm" id="quiz-play-reversed">&#9654; Play Reversed</button>
+        <div class="quiz-options quiz-options--col" id="quiz-options" style="margin-top:0.75rem"></div>
         <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
       `;
 
@@ -584,36 +689,41 @@ export function renderLearn(container) {
       });
       wordDisplay.appendChild(wr.el);
 
-      const builtEl = area.querySelector('#quiz-built');
-      const feedback = area.querySelector('#quiz-feedback');
-      let built = [];
-      let answered = false;
+      const reversedSyls = [...syls].reverse();
+
+      area.querySelector('#quiz-play-reversed').addEventListener('click', () => playWord(reversedSyls));
 
       const optionsEl = area.querySelector('#quiz-options');
-      for (const note of NOTES) {
+      const feedback = area.querySelector('#quiz-feedback');
+      let answered = false;
+
+      options.forEach((opt, idx) => {
         const btn = document.createElement('button');
-        btn.className = 'btn note-btn';
-        btn.style.borderBottomColor = getColor(note);
-        btn.textContent = note.charAt(0).toUpperCase() + note.slice(1);
-        btn.addEventListener('click', () => addNote(note));
+        btn.className = 'btn quiz-choice';
+        btn.style.textAlign = 'left';
+
+        const numSpan = document.createElement('span');
+        numSpan.className = 'quiz-choice-num';
+        numSpan.textContent = idx + 1;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = `"${opt.text}"`;
+
+        btn.append(numSpan, labelSpan);
+        btn.addEventListener('click', () => handleChoice(opt, btn));
         optionsEl.appendChild(btn);
-      }
+      });
 
-      function addNote(note) {
+      function handleChoice(opt, btn) {
         if (answered) return;
-        playNote(note, { duration: 0.3 });
-        built.push(note);
-        builtEl.innerHTML = '';
-        builtEl.appendChild(createWordBlocks(built, { size: 'sm' }));
-      }
-
-      function submit() {
-        if (answered || built.length === 0) return;
         answered = true;
-
-        const reversedSyls = [...syls].reverse();
-        const correct = built.length === reversedSyls.length && built.every((s, i) => s === reversedSyls[i]);
+        const correct = opt.correct;
         updateScore(correct);
+        srsRecord({ type: 'antonym', value: entry.solresol }, correct);
+        if (correct) recordLevelCorrect(2);
+        renderProgressBar();
+        renderModeButtons();
+        renderStats();
 
         const antWord = new SolresolWord(antonymWord);
         const antWr = createWordRenderer(antWord, {
@@ -623,102 +733,22 @@ export function renderLearn(container) {
         });
 
         if (correct) {
-          feedback.textContent = `Correct! ${entry.solresol} (${entry.definition}) ↔ ${antonymWord} (${antonymDef})`;
+          btn.classList.add('btn--correct');
+          feedback.textContent = `Correct! ${entry.solresol} ("${entry.definition}") reversed = ${antonymWord} ("${antonymDef}")`;
           feedback.className = 'quiz-feedback correct';
         } else {
-          feedback.textContent = `The reverse is ${antonymWord} (${antonymDef})`;
+          btn.classList.add('btn--wrong');
+          feedback.textContent = `Wrong \u2014 the reversed word ${antonymWord} means "${antonymDef}"`;
           feedback.className = 'quiz-feedback wrong';
+          optionsEl.querySelectorAll('.quiz-choice').forEach(b => {
+            const lbl = b.querySelector('span:nth-child(2)');
+            if (lbl && lbl.textContent === `"${antonymDef}"`) b.classList.add('btn--correct');
+          });
         }
         feedback.appendChild(antWr.el);
         playWord(reversedSyls);
 
         nextRound(3000);
-      }
-
-      area.querySelector('#quiz-clear').addEventListener('click', () => { built = []; builtEl.innerHTML = ''; });
-      area.querySelector('#quiz-submit').addEventListener('click', submit);
-
-      setKeyHandler((e) => {
-        const n = Number(e.key);
-        if (n >= 1 && n <= 7) { e.preventDefault(); addNote(NOTES[n - 1]); }
-        else if (e.key === 'Enter') { e.preventDefault(); submit(); }
-        else if (e.key === 'Backspace') { e.preventDefault(); built = []; builtEl.innerHTML = ''; }
-      });
-    }
-
-    // --- Translation Quiz ---
-    function translateRound() {
-      const entries = getAllEntries().filter(e => e.definition && e.syllables >= 2);
-      if (entries.length < 4) {
-        area.innerHTML = '<p class="no-results">Not enough entries for this mode</p>';
-        return;
-      }
-
-      const correct = pickRandom(entries);
-      const wrongs = [];
-      let safety = 0;
-      while (wrongs.length < 3 && safety < 100) {
-        const w = pickRandom(entries);
-        if (w !== correct && !wrongs.includes(w)) wrongs.push(w);
-        safety++;
-      }
-
-      const options = shuffle([correct, ...wrongs]);
-
-      area.innerHTML = `
-        <p class="quiz-prompt">Which Solresol word means:</p>
-        <p class="quiz-target-word">"${correct.definition}"</p>
-        <div class="quiz-options" id="quiz-options"></div>
-        <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
-      `;
-
-      const optionsEl = area.querySelector('#quiz-options');
-      const feedback = area.querySelector('#quiz-feedback');
-      let answered = false;
-
-      options.forEach((opt, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'btn quiz-choice';
-        const syls = parseWord(opt.solresol);
-
-        const numLabel = document.createElement('span');
-        numLabel.className = 'quiz-choice-num';
-        numLabel.textContent = idx + 1;
-
-        const label = document.createElement('span');
-        label.textContent = opt.solresol;
-
-        btn.appendChild(numLabel);
-        btn.appendChild(label);
-        btn.appendChild(createWordBlocks(syls, { size: 'sm', showLabel: false }));
-
-        btn.addEventListener('click', () => handleChoice(opt, btn, syls));
-        optionsEl.appendChild(btn);
-      });
-
-      function handleChoice(opt, btn, syls) {
-        if (answered) return;
-        answered = true;
-        const isCorrect = opt === correct;
-        updateScore(isCorrect);
-
-        if (isCorrect) {
-          btn.classList.add('btn--correct');
-          feedback.textContent = 'Correct!';
-          feedback.className = 'quiz-feedback correct';
-          playWord(syls);
-        } else {
-          btn.classList.add('btn--wrong');
-          feedback.textContent = `Wrong — it was ${correct.solresol}`;
-          feedback.className = 'quiz-feedback wrong';
-          optionsEl.querySelectorAll('.quiz-choice').forEach(b => {
-            if (b.querySelector('span:nth-child(2)')?.textContent === correct.solresol) {
-              b.classList.add('btn--correct');
-            }
-          });
-        }
-
-        nextRound(2000);
       }
 
       setKeyHandler((e) => {
@@ -727,9 +757,272 @@ export function renderLearn(container) {
           e.preventDefault();
           const opt = options[n - 1];
           const btn = optionsEl.querySelectorAll('.quiz-choice')[n - 1];
-          const syls = parseWord(opt.solresol);
-          handleChoice(opt, btn, syls);
+          handleChoice(opt, btn);
         }
+      });
+
+      // Play original word first, then reversed after a delay
+      setTimeout(() => playWord(syls), 300);
+      setTimeout(() => playWord(reversedSyls), 300 + syls.length * 400 + 600);
+    }
+
+    // =============================
+    // LEVEL 4: Grammar Discovery
+    // =============================
+    function grammarDiscoveryRound() {
+      const entries = getAllEntries().filter(e => e.syllables >= 3 && e.definition);
+      if (entries.length < 4) { area.innerHTML = '<p class="no-results">Not enough entries</p>'; return; }
+
+      const entry = pickWeightedEntry(entries, 'stress');
+      const syls = parseWord(entry.solresol);
+      srsEncounter(entry.solresol, 'grammar-quiz');
+
+      // Pick two different stress positions
+      const stressOptions = [
+        { pos: null, label: 'Noun', rule: STRESS_RULES.noun },
+        { pos: 'last', label: 'Adjective', rule: STRESS_RULES.adjective },
+        { pos: 'penultimate', label: 'Verb', rule: STRESS_RULES.verb },
+      ];
+      // Only allow antepenultimate if word has 3+ syllables
+      if (syls.length >= 3) {
+        stressOptions.push({ pos: 'antepenultimate', label: 'Adverb', rule: STRESS_RULES.adverb });
+      }
+
+      const twoStress = shuffle(stressOptions).slice(0, 2);
+      const stressA = twoStress[0];
+      const stressB = twoStress[1];
+      const correctAnswer = `${stressA.label}\u2192${stressB.label}`;
+
+      // Build word objects with stress for playback
+      const wordA = new SolresolWord(entry.solresol);
+      wordA.stressPosition = stressA.pos;
+      const wordB = new SolresolWord(entry.solresol);
+      wordB.stressPosition = stressB.pos;
+
+      // Build wrong choices
+      const allTransitions = [];
+      for (let i = 0; i < stressOptions.length; i++) {
+        for (let j = 0; j < stressOptions.length; j++) {
+          if (i !== j) {
+            const t = `${stressOptions[i].label}\u2192${stressOptions[j].label}`;
+            if (t !== correctAnswer) allTransitions.push(t);
+          }
+        }
+      }
+      const wrongChoices = shuffle(allTransitions).slice(0, 3);
+      const options = shuffle([correctAnswer, ...wrongChoices]);
+
+      area.innerHTML = `
+        <p class="quiz-prompt">This word is played with two different stress positions.</p>
+        <p class="quiz-hint">What changed from the first to the second?</p>
+        <div id="quiz-word-display" style="margin:0.75rem 0"></div>
+        <div style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:0.75rem">
+          <button class="btn btn--sm" id="quiz-play-a">&#9654; First (${stressA.label})</button>
+          <button class="btn btn--sm" id="quiz-play-b">&#9654; Second (?)</button>
+          <button class="btn btn--sm" id="quiz-play-both">&#9654; Both</button>
+        </div>
+        <div class="quiz-options quiz-options--col" id="quiz-options"></div>
+        <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
+      `;
+
+      const wordDisplay = area.querySelector('#quiz-word-display');
+      const wr = createWordRenderer(wordA, {
+        size: 'md', showSheet: false, showDefinition: false, reactive: false,
+        clickToFocus: true,
+        notations: new Set(['colors']),
+      });
+      wordDisplay.appendChild(wr.el);
+
+      function playWithStress(word) {
+        const params = stressParams(word);
+        let delay = 0;
+        params.forEach(p => {
+          setTimeout(() => playNote(p.syllable, { duration: p.duration, gain: p.gain }), delay * 1000);
+          delay += p.duration + 0.05;
+        });
+      }
+
+      area.querySelector('#quiz-play-a').addEventListener('click', () => playWithStress(wordA));
+      area.querySelector('#quiz-play-b').addEventListener('click', () => playWithStress(wordB));
+      area.querySelector('#quiz-play-both').addEventListener('click', () => {
+        playWithStress(wordA);
+        const totalA = stressParams(wordA).reduce((s, p) => s + p.duration + 0.05, 0);
+        setTimeout(() => playWithStress(wordB), (totalA + 0.5) * 1000);
+      });
+
+      const optionsEl = area.querySelector('#quiz-options');
+      const feedback = area.querySelector('#quiz-feedback');
+      let answered = false;
+
+      options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn quiz-choice';
+        btn.style.textAlign = 'left';
+
+        const numSpan = document.createElement('span');
+        numSpan.className = 'quiz-choice-num';
+        numSpan.textContent = idx + 1;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = opt;
+
+        btn.append(numSpan, labelSpan);
+        btn.addEventListener('click', () => handleChoice(opt, btn));
+        optionsEl.appendChild(btn);
+      });
+
+      function handleChoice(opt, btn) {
+        if (answered) return;
+        answered = true;
+        const correct = opt === correctAnswer;
+        updateScore(correct);
+        srsRecord({ type: 'stress', value: correctAnswer }, correct);
+        if (correct) recordLevelCorrect(3);
+        renderProgressBar();
+        renderModeButtons();
+        renderStats();
+
+        if (correct) {
+          btn.classList.add('btn--correct');
+          feedback.innerHTML = `Correct! The stress shifted: <strong>${stressA.label}</strong> (${stressA.rule}) \u2192 <strong>${stressB.label}</strong> (${stressB.rule})`;
+          feedback.className = 'quiz-feedback correct';
+        } else {
+          btn.classList.add('btn--wrong');
+          feedback.innerHTML = `Wrong \u2014 the change was <strong>${correctAnswer}</strong>`;
+          feedback.className = 'quiz-feedback wrong';
+          optionsEl.querySelectorAll('.quiz-choice').forEach(b => {
+            const lbl = b.querySelector('span:nth-child(2)');
+            if (lbl && lbl.textContent === correctAnswer) b.classList.add('btn--correct');
+          });
+        }
+
+        nextRound(2500);
+      }
+
+      setKeyHandler((e) => {
+        const n = Number(e.key);
+        if (n >= 1 && n <= options.length) {
+          e.preventDefault();
+          const opt = options[n - 1];
+          const btn = optionsEl.querySelectorAll('.quiz-choice')[n - 1];
+          handleChoice(opt, btn);
+        }
+      });
+
+      // Auto-play both versions
+      setTimeout(() => {
+        playWithStress(wordA);
+        const totalA = stressParams(wordA).reduce((s, p) => s + p.duration + 0.05, 0);
+        setTimeout(() => playWithStress(wordB), (totalA + 0.5) * 1000);
+      }, 300);
+    }
+
+    // =============================
+    // LEVEL 5: Composition (enhanced translate)
+    // =============================
+    function compositionRound() {
+      const entries = getAllEntries().filter(e => e.definition && e.syllables >= 2 && e.syllables <= 4);
+      if (entries.length < 4) {
+        area.innerHTML = '<p class="no-results">Not enough entries for this mode</p>';
+        return;
+      }
+
+      const correct = pickWeightedEntry(entries, 'word');
+      const correctSyls = parseWord(correct.solresol);
+      srsEncounter(correct.solresol, 'composition-quiz');
+
+      area.innerHTML = `
+        <p class="quiz-prompt">Build the Solresol word for:</p>
+        <p class="quiz-target-word">"${correct.definition}"</p>
+        <p class="quiz-hint">Press keys 1\u20137 to add notes, Enter to submit, Backspace to clear</p>
+        <div class="quiz-built" id="quiz-built"></div>
+        <div class="quiz-options" id="quiz-options"></div>
+        <div class="quiz-actions">
+          <button class="btn btn--sm" id="quiz-clear">Clear</button>
+          <button class="btn btn--sm" id="quiz-submit">Submit</button>
+          <button class="btn btn--sm" id="quiz-hint-btn" style="margin-left:auto">Hint</button>
+        </div>
+        <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
+      `;
+
+      const builtEl = area.querySelector('#quiz-built');
+      const feedback = area.querySelector('#quiz-feedback');
+      let built = [];
+      let answered = false;
+      let hintUsed = false;
+
+      area.querySelector('#quiz-clear').addEventListener('click', () => { built = []; builtEl.innerHTML = ''; });
+
+      // Hint: reveal first syllable
+      area.querySelector('#quiz-hint-btn').addEventListener('click', () => {
+        if (hintUsed || answered) return;
+        hintUsed = true;
+        const hintNote = correctSyls[0];
+        const hintEl = document.createElement('p');
+        hintEl.className = 'quiz-hint';
+        hintEl.style.color = getColor(hintNote);
+        hintEl.textContent = `Starts with ${displaySyllable(hintNote)} (${correctSyls.length} syllables total)`;
+        area.querySelector('#quiz-hint-btn').disabled = true;
+        area.querySelector('.quiz-actions').after(hintEl);
+        playNote(hintNote, { duration: 0.5 });
+      });
+
+      const optionsEl = area.querySelector('#quiz-options');
+      for (const note of NOTES) {
+        const btn = document.createElement('button');
+        btn.className = 'btn note-btn';
+        btn.style.borderBottomColor = getColor(note);
+        btn.textContent = displaySyllable(note);
+        btn.addEventListener('click', () => addNote(note));
+        optionsEl.appendChild(btn);
+      }
+
+      function addNote(note) {
+        if (answered) return;
+        playNote(note, { duration: 0.3 });
+        built.push(note);
+        builtEl.innerHTML = '';
+        builtEl.appendChild(createWordBlocks(built, { size: 'sm' }));
+      }
+
+      function submit() {
+        if (answered || built.length === 0) return;
+        answered = true;
+        const isCorrect = built.length === correctSyls.length && built.every((s, i) => s === correctSyls[i]);
+        updateScore(isCorrect);
+        srsRecord({ type: 'word', value: correct.solresol }, isCorrect);
+        if (isCorrect) recordLevelCorrect(4);
+        renderProgressBar();
+        renderModeButtons();
+        renderStats();
+
+        const word = new SolresolWord(correct.solresol);
+        const wr = createWordRenderer(word, {
+          size: 'md', showSheet: false, showDefinition: true, reactive: false,
+          clickToFocus: true,
+          notations: new Set(['colors']),
+        });
+
+        if (isCorrect) {
+          feedback.textContent = `Correct! ${correct.solresol} = "${correct.definition}"`;
+          feedback.className = 'quiz-feedback correct';
+        } else {
+          feedback.textContent = `Wrong \u2014 it was ${correct.solresol} (${correct.definition})`;
+          feedback.className = 'quiz-feedback wrong';
+        }
+        feedback.appendChild(wr.el);
+        playWord(correctSyls);
+
+        nextRound(2500);
+      }
+
+      area.querySelector('#quiz-submit').addEventListener('click', submit);
+
+      setKeyHandler((e) => {
+        const n = Number(e.key);
+        if (n >= 1 && n <= 7) { e.preventDefault(); addNote(NOTES[n - 1]); }
+        else if (e.key === 'Enter') { e.preventDefault(); submit(); }
+        else if (e.key === 'Backspace') { e.preventDefault(); built = []; builtEl.innerHTML = ''; }
       });
     }
 

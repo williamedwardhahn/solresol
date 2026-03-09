@@ -1,5 +1,6 @@
 import { getColor } from '../utils/solresol.js';
 import { getSyllableNotations } from '../utils/notation.js';
+import { displaySyllable } from '../utils/format.js';
 
 const CARD_W = 600;
 const CARD_H = 320;
@@ -48,7 +49,7 @@ export function renderWordCard(word) {
     ctx.font = `bold ${Math.round(blockSize * 0.28)}px Inter, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const label = syls[i].charAt(0).toUpperCase() + syls[i].slice(1);
+    const label = displaySyllable(syls[i]);
     ctx.fillText(label, x + blockSize / 2, blockY + blockSize / 2);
   }
 

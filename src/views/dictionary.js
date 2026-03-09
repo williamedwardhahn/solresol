@@ -7,9 +7,11 @@ import { SEMANTIC_CATEGORIES } from '../utils/grammar.js';
 import { getAntonymPairs, getAntonym } from '../utils/antonyms.js';
 import { numberToSolresol, getNumberTable } from '../utils/numbers.js';
 import { playWord } from '../audio/synth.js';
-import { setFocusWord } from '../state/focus-word.js';
+import { inspectWord } from '../state/focus-word.js';
 import { getHashParams } from '../app.js';
 import { createSunburst } from '../components/sunburst.js';
+import { managed } from '../utils/lifecycle.js';
+import { displaySyllable, displayWord } from '../utils/format.js';
 
 const PAGE_SIZE = 50;
 
@@ -58,10 +60,10 @@ export function renderDictionary(container) {
     }
   });
 
-  let sunburstInstance = null;
+  const dictScope = managed();
 
   function renderMode() {
-    if (sunburstInstance) { sunburstInstance.destroy(); sunburstInstance = null; }
+    dictScope.destroyAll();
     contentEl.innerHTML = '';
     if (mode === 'all') renderAllWords(contentEl);
     else if (mode === 'sunburst') renderSunburstMode(contentEl);
@@ -84,7 +86,7 @@ export function renderDictionary(container) {
           </select></label>
           <label>Starting note: <select id="dict-start" class="select">
             <option value="">All</option>
-            ${NOTES.map(n => `<option value="${n}">${n.charAt(0).toUpperCase() + n.slice(1)}</option>`).join('')}
+            ${NOTES.map(n => `<option value="${n}">${displaySyllable(n)}</option>`).join('')}
           </select></label>
         </div>
       </div>
@@ -148,7 +150,7 @@ export function renderDictionary(container) {
         row.appendChild(playBtn);
         row.addEventListener('click', (e) => {
           if (e.target.closest('.btn')) return;
-          setFocusWord(entry.solresol);
+          inspectWord(entry.solresol);
         });
         listEl.appendChild(row);
       }
@@ -201,7 +203,7 @@ export function renderDictionary(container) {
       btn.style.borderLeftColor = cat.color;
       btn.style.borderLeftWidth = '4px';
       btn.style.borderLeftStyle = 'solid';
-      btn.innerHTML = `<span class="explorer-cat-note" style="color:${cat.color}">${note.charAt(0).toUpperCase() + note.slice(1)}</span>
+      btn.innerHTML = `<span class="explorer-cat-note" style="color:${cat.color}">${displaySyllable(note)}</span>
         <span class="explorer-cat-desc">${cat.label.split('—')[1]?.trim() || ''}</span>`;
       btn.addEventListener('click', () => {
         catsEl.querySelectorAll('.explorer-cat-btn').forEach(b => b.classList.remove('btn--active'));
@@ -224,7 +226,7 @@ export function renderDictionary(container) {
       const basic = families.get('_basic');
       if (basic) { familiesEl.appendChild(createFamily('Basic Words', basic, [note])); families.delete('_basic'); }
       for (const [key, members] of families) {
-        familiesEl.appendChild(createFamily(key.charAt(0).toUpperCase() + key.slice(1) + '- family', members, parseWord(key)));
+        familiesEl.appendChild(createFamily(displayWord(parseWord(key)) + '- family', members, parseWord(key)));
       }
     }
 
@@ -263,7 +265,7 @@ export function renderDictionary(container) {
         playBtn.innerHTML = '&#9654;';
         playBtn.addEventListener('click', (e) => { e.stopPropagation(); playWord(syls); });
         row.appendChild(playBtn);
-        row.addEventListener('click', (e) => { if (!e.target.closest('.btn')) setFocusWord(entry.solresol); });
+        row.addEventListener('click', (e) => { if (!e.target.closest('.btn')) inspectWord(entry.solresol); });
         list.appendChild(row);
       }
       section.append(header, list);
@@ -401,15 +403,15 @@ export function renderDictionary(container) {
       <div id="sunburst-container" class="sunburst-container"></div>
     `;
     const sunburstEl = el.querySelector('#sunburst-container');
-    sunburstInstance = createSunburst(sunburstEl);
+    const sunburstInstance = dictScope.track(createSunburst(sunburstEl));
     // Auto-zoom if deep-linked
     if (params.zoom && sunburstInstance.zoomTo) {
       sunburstInstance.zoomTo(params.zoom);
     }
   }
 
-  // Cleanup debounce timers on navigation
+  // Cleanup on navigation
   return () => {
-    if (sunburstInstance) { sunburstInstance.destroy(); sunburstInstance = null; }
+    dictScope.destroyAll();
   };
 }

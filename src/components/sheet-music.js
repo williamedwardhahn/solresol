@@ -1,4 +1,5 @@
 import { getColor } from '../utils/solresol.js';
+import { displaySyllable } from '../utils/format.js';
 
 const NOTE_POSITIONS = {
   do:  6,  // C4 - ledger line below
@@ -105,7 +106,7 @@ export function createSheetMusic(syllables, opts = {}) {
       label.setAttribute('font-size', '10');
       label.setAttribute('fill', getColor(syl));
       label.setAttribute('font-weight', 'bold');
-      label.textContent = syl.charAt(0).toUpperCase() + syl.slice(1);
+      label.textContent = displaySyllable(syl);
       svg.appendChild(label);
     }
   });

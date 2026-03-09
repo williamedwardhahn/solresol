@@ -3,11 +3,12 @@ import { createWordRenderer } from '../components/word-renderer.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
 import { playSentence } from '../audio/synth.js';
-import { focusWord, committedWords, commitFocusWord, clearSentence, undoLastWord } from '../state/focus-word.js';
+import { committedWords, commitBuildingWord, clearSentence, undoLastWord } from '../state/focus-word.js';
 import { buildSentence, TENSE_MARKERS } from '../utils/grammar.js';
 import { searchDictionary, parseWord, translate } from '../utils/solresol.js';
 import { on } from '../utils/events.js';
 import { createSequencer } from '../components/sequencer.js';
+import { createColorInput } from '../components/color-input.js';
 
 /**
  * Play view — the home page.
@@ -26,6 +27,7 @@ export function renderPlay(container) {
         <button class="btn btn--active" data-mode="free">Free Play</button>
         <button class="btn" data-mode="compose">Compose Sentence</button>
         <button class="btn" data-mode="sequencer">Sequencer</button>
+        <button class="btn" data-mode="paint">Paint</button>
       </div>
 
       <div id="play-free" class="play-section">
@@ -34,6 +36,7 @@ export function renderPlay(container) {
       </div>
 
       <div id="play-sequencer" class="play-section" style="display:none"></div>
+      <div id="play-paint" class="play-section" style="display:none"></div>
 
       <div id="play-compose" class="play-section" style="display:none">
         <div class="composer-slots" id="composer-slots"></div>
@@ -69,9 +72,11 @@ export function renderPlay(container) {
   const freeSection = container.querySelector('#play-free');
   const composeSection = container.querySelector('#play-compose');
   const seqSection = container.querySelector('#play-sequencer');
+  const paintSection = container.querySelector('#play-paint');
   const modeBtns = container.querySelectorAll('[data-mode]');
   let mode = 'free';
   let sequencer = null;
+  let colorInput = null;
 
   // Mode toggle
   modeBtns.forEach(btn => {
@@ -82,8 +87,12 @@ export function renderPlay(container) {
       freeSection.style.display = mode === 'free' ? '' : 'none';
       composeSection.style.display = mode === 'compose' ? '' : 'none';
       seqSection.style.display = mode === 'sequencer' ? '' : 'none';
+      paintSection.style.display = mode === 'paint' ? '' : 'none';
       if (mode === 'sequencer' && !sequencer) {
         sequencer = createSequencer(seqSection);
+      }
+      if (mode === 'paint' && !colorInput) {
+        colorInput = createColorInput(paintSection);
       }
     });
   });

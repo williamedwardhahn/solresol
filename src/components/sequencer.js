@@ -1,9 +1,10 @@
 import { NOTES, NOTE_COLORS } from '../utils/constants.js';
 import { SolresolWord } from '../models/word.js';
 import { createWordBlocks } from './color-block.js';
-import { playNote, playWord } from '../audio/synth.js';
-import { getFrequency } from '../utils/solresol.js';
+import { playSentence } from '../audio/synth.js';
 import { translate } from '../utils/solresol.js';
+import { displayWord } from '../utils/format.js';
+import { on } from '../utils/events.js';
 
 /**
  * Sequencer component — timeline with record/play/loop, tempo control,
@@ -20,7 +21,6 @@ export function createSequencer(container) {
     cursor: 0,           // current playback position in seconds
     animFrame: null,
     playStartTime: null,
-    audioCtxStartTime: null,
   };
 
   container.innerHTML = `
@@ -100,7 +100,7 @@ export function createSequencer(container) {
   exportBtn.addEventListener('click', exportMidi);
 
   function addWord(syllables) {
-    const text = syllables.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    const text = displayWord(syllables);
     state.words.push({ syllables: [...syllables], text });
     renderTimeline();
   }
@@ -187,12 +187,8 @@ export function createSequencer(container) {
     state.playing = true;
     playBtn.disabled = true;
 
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    scheduleAudio(audioCtx);
+    scheduleAudio();
     state.playStartTime = performance.now();
-    state.audioCtxStartTime = audioCtx.currentTime;
     state.cursor = 0;
 
     const totalDur = getTotalDuration();
@@ -207,7 +203,7 @@ export function createSequencer(container) {
       if (elapsed >= totalDur) {
         if (state.looping) {
           state.playStartTime = performance.now();
-          scheduleAudio(audioCtx);
+          scheduleAudio();
           state.animFrame = requestAnimationFrame(tick);
         } else {
           stopPlayback();
@@ -220,35 +216,9 @@ export function createSequencer(container) {
     state.animFrame = requestAnimationFrame(tick);
   }
 
-  function scheduleAudio(audioCtx) {
-    const interval = 1 / state.tempo;
-    let offset = 0;
-
-    for (const w of state.words) {
-      for (let i = 0; i < w.syllables.length; i++) {
-        const syl = w.syllables[i];
-        const freq = getFrequency(syl);
-        if (!freq) continue;
-
-        const startTime = audioCtx.currentTime + offset + i * interval;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(0.3, startTime + 0.02);
-        gain.gain.linearRampToValueAtTime(0.21, startTime + 0.1);
-        gain.gain.setValueAtTime(0.21, startTime + interval * 0.9 - 0.05);
-        gain.gain.linearRampToValueAtTime(0, startTime + interval * 0.9);
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + interval * 0.9);
-      }
-      offset += w.syllables.length * interval + state.wordGap;
-    }
+  function scheduleAudio() {
+    const words = state.words.map(w => w.syllables);
+    playSentence(words, { tempo: state.tempo, wordGap: state.wordGap });
   }
 
   function stopPlayback() {
@@ -347,12 +317,28 @@ export function createSequencer(container) {
 
   renderTimeline();
 
+  // Cross-view recording: auto-add words committed from any view
+  on('word:commit', ({ word }) => {
+    if (state.recording && word && word.syllables) {
+      addWord(word.syllables);
+    }
+  });
+
+  // Allow other components (e.g. context panel) to add words directly
+  on('sequencer:add', ({ syllables }) => {
+    if (syllables) addWord(syllables);
+  });
+
   // Public API
   return {
     el: container,
     addWord,
     removeWord,
     isRecording: () => state.recording,
+    setRecording(val) {
+      state.recording = val;
+      recBtn.classList.toggle('seq-rec--active', val);
+    },
     destroy() {
       stopPlayback();
       container.innerHTML = '';

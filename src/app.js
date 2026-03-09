@@ -6,6 +6,7 @@ import { initGlobalKeyboard } from './components/global-keyboard.js';
 import { initContextPanel } from './components/context-panel.js';
 import { initSentenceBar } from './components/sentence-bar.js';
 import { hasOnboarded, renderOnboarding } from './components/onboarding.js';
+import { initMicroQuiz } from './components/micro-quiz.js';
 
 const routes = {
   play:       { label: 'Play',       render: renderPlay },
@@ -37,7 +38,7 @@ export function getHashParams() {
   return Object.fromEntries(new URLSearchParams(hash.slice(qIdx + 1)));
 }
 
-function navigate(route) {
+function renderRoute(route) {
   if (currentCleanup) {
     currentCleanup();
     currentCleanup = null;
@@ -66,6 +67,26 @@ function navigate(route) {
   try { localStorage.setItem('solresol:route', route); } catch {}
 }
 
+function navigate(route) {
+  const content = document.getElementById('app-content');
+
+  // Use View Transitions API if available for smooth crossfade
+  if (document.startViewTransition) {
+    document.startViewTransition(() => renderRoute(route));
+  } else {
+    // CSS fallback: fade out, swap, fade in
+    content.classList.add('view-exit');
+    setTimeout(() => {
+      renderRoute(route);
+      content.classList.remove('view-exit');
+      content.classList.add('view-enter');
+      requestAnimationFrame(() => {
+        setTimeout(() => content.classList.remove('view-enter'), 200);
+      });
+    }, 120);
+  }
+}
+
 export function initApp() {
   const nav = document.getElementById('app-nav');
   const toggle = document.getElementById('nav-toggle');
@@ -74,6 +95,7 @@ export function initApp() {
   initGlobalKeyboard(document.getElementById('global-keyboard'));
   initContextPanel(document.getElementById('context-panel'));
   initSentenceBar(document.getElementById('sentence-bar'));
+  initMicroQuiz();
 
   // Build nav links
   for (const [route, config] of Object.entries(routes)) {

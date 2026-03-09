@@ -1,7 +1,10 @@
 import { NOTES, NOTE_COLORS } from '../utils/constants.js';
 import { getAllEntries, parseWord } from '../utils/solresol.js';
 import { SEMANTIC_CATEGORIES } from '../utils/grammar.js';
-import { setFocusWord } from '../state/focus-word.js';
+import { inspectWord, buildingWord } from '../state/focus-word.js';
+import { displaySyllable } from '../utils/format.js';
+import { on, emit } from '../utils/events.js';
+import { playNote } from '../audio/synth.js';
 
 const TAU = Math.PI * 2;
 const SIZE = 520;
@@ -79,6 +82,9 @@ export function createSunburst(container, { onWordSelect } = {}) {
     });
     svg.appendChild(center);
     svg.appendChild(centerText);
+
+    // Re-apply highlights after re-render (render clears innerHTML)
+    highlightPath(buildingWord.syllables);
   }
 
   function renderOverview() {
@@ -97,12 +103,18 @@ export function createSunburst(container, { onWordSelect } = {}) {
 
       // Ring 0: main sector
       const arc0 = createArc(CX, CY, R0, R1, startAngle, endAngle, color, 0.85);
+      arc0.dataset.syl1 = note;
+      arc0.dataset.ring = '0';
       arc0.style.cursor = 'pointer';
       arc0.addEventListener('click', () => {
+        // Fusion: clicking an arc acts as input
+        playNote(note);
+        buildingWord.push(note);
+        emit('syllable:play', { syllable: note });
         zoomedNote = note;
         render();
       });
-      arc0.addEventListener('mouseenter', (e) => showTooltip(e, `${capitalize(note)} — ${tree[note].count} words`));
+      arc0.addEventListener('mouseenter', (e) => showTooltip(e, `${displaySyllable(note)} — ${tree[note].count} words`));
       arc0.addEventListener('mouseleave', hideTooltip);
       svg.appendChild(arc0);
 
@@ -111,7 +123,7 @@ export function createSunburst(container, { onWordSelect } = {}) {
       const labelR = (R0 + R1) / 2;
       const lx = CX + Math.cos(midAngle) * labelR;
       const ly = CY + Math.sin(midAngle) * labelR;
-      const label = createText(lx, ly, capitalize(note), 13, '#fff');
+      const label = createText(lx, ly, displaySyllable(note), 13, '#fff');
       label.style.pointerEvents = 'none';
       svg.appendChild(label);
 
@@ -128,13 +140,25 @@ export function createSunburst(container, { onWordSelect } = {}) {
         const subColor = NOTE_COLORS[n2];
 
         const arc1 = createArc(CX, CY, R1 + 2, R2, subAngle, subEnd, subColor, 0.5);
+        arc1.dataset.syl1 = note;
+        arc1.dataset.syl2 = n2;
+        arc1.dataset.ring = '1';
         arc1.style.cursor = 'pointer';
         arc1.addEventListener('click', () => {
+          // Fusion: clicking a ring-1 arc adds syllables as input
+          if (buildingWord.length === 0) {
+            playNote(note);
+            buildingWord.push(note);
+            emit('syllable:play', { syllable: note });
+          }
+          playNote(n2);
+          buildingWord.push(n2);
+          emit('syllable:play', { syllable: n2 });
           zoomedNote = note;
           render();
         });
         arc1.addEventListener('mouseenter', (e) =>
-          showTooltip(e, `${capitalize(note)}${capitalize(n2)}— ${child.count} words`)
+          showTooltip(e, `${displaySyllable(note)}${displaySyllable(n2)}— ${child.count} words`)
         );
         arc1.addEventListener('mouseleave', hideTooltip);
         svg.appendChild(arc1);
@@ -145,7 +169,7 @@ export function createSunburst(container, { onWordSelect } = {}) {
           const sR = (R1 + R2) / 2;
           const sx = CX + Math.cos(sMid) * sR;
           const sy = CY + Math.sin(sMid) * sR;
-          const sLabel = createText(sx, sy, capitalize(n2), 9, '#ddd');
+          const sLabel = createText(sx, sy, displaySyllable(n2), 9, '#ddd');
           sLabel.style.pointerEvents = 'none';
           svg.appendChild(sLabel);
         }
@@ -168,7 +192,7 @@ export function createSunburst(container, { onWordSelect } = {}) {
 
     // Category label
     const cat = SEMANTIC_CATEGORIES[note];
-    const catLabel = createText(CX, 22, cat ? cat.label : capitalize(note), 13, color);
+    const catLabel = createText(CX, 22, cat ? cat.label : displaySyllable(note), 13, color);
     svg.appendChild(catLabel);
 
     for (const [n2, child] of childEntries) {
@@ -180,9 +204,23 @@ export function createSunburst(container, { onWordSelect } = {}) {
 
       // Family sector
       const arc = createArc(CX, CY, R0, R1, startAngle, endAngle, subColor, 0.7);
+      arc.dataset.syl1 = note;
+      arc.dataset.syl2 = n2;
+      arc.dataset.ring = '0';
       arc.style.cursor = 'pointer';
+      arc.addEventListener('click', () => {
+        // Fusion: clicking a zoomed family sector adds the second syllable
+        if (buildingWord.length === 0) {
+          playNote(note);
+          buildingWord.push(note);
+          emit('syllable:play', { syllable: note });
+        }
+        playNote(n2);
+        buildingWord.push(n2);
+        emit('syllable:play', { syllable: n2 });
+      });
       arc.addEventListener('mouseenter', (e) => {
-        const prefix = capitalize(note) + capitalize(n2);
+        const prefix = displaySyllable(note) + displaySyllable(n2);
         const sample = child.entries.slice(0, 3).map(e => `${e.solresol}: ${e.definition || '?'}`).join('\n');
         showTooltip(e, `${prefix}— (${child.count})\n${sample}`);
       });
@@ -195,7 +233,7 @@ export function createSunburst(container, { onWordSelect } = {}) {
       const lx = CX + Math.cos(midAngle) * labelR;
       const ly = CY + Math.sin(midAngle) * labelR;
       if (sweep > 0.2) {
-        const label = createText(lx, ly, capitalize(n2), 12, '#fff');
+        const label = createText(lx, ly, displaySyllable(n2), 12, '#fff');
         label.style.pointerEvents = 'none';
         svg.appendChild(label);
       }
@@ -211,9 +249,14 @@ export function createSunburst(container, { onWordSelect } = {}) {
           const wColor = syls.length >= 3 ? NOTE_COLORS[syls[2]] || subColor : subColor;
 
           const wArc = createArc(CX, CY, R1 + 3, R2, wStart, wEnd, wColor, 0.4);
+          wArc.dataset.syl1 = note;
+          wArc.dataset.syl2 = n2;
+          if (syls.length >= 3) wArc.dataset.syl3 = syls[2];
+          wArc.dataset.word = entry.solresol;
+          wArc.dataset.ring = '2';
           wArc.style.cursor = 'pointer';
           wArc.addEventListener('click', () => {
-            setFocusWord(entry.solresol);
+            inspectWord(entry.solresol);
             if (onWordSelect) onWordSelect(entry);
           });
           wArc.addEventListener('mouseenter', (e) =>
@@ -296,16 +339,65 @@ export function createSunburst(container, { onWordSelect } = {}) {
     return el;
   }
 
-  function capitalize(s) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
 
   render();
 
+  /** Remove all active highlights from arcs */
+  function clearHighlights() {
+    svg.querySelectorAll('.sun-arc--active').forEach(el => {
+      el.classList.remove('sun-arc--active');
+    });
+  }
+
+  /** Highlight arcs matching the current buildingWord syllable path */
+  function highlightPath(syllables) {
+    clearHighlights();
+    if (syllables.length === 0) return;
+
+    // Highlight ring 0 arcs matching first syllable
+    if (syllables.length >= 1) {
+      svg.querySelectorAll(`[data-syl1="${syllables[0]}"][data-ring="0"]`).forEach(el => {
+        el.classList.add('sun-arc--active');
+      });
+    }
+
+    // Highlight ring 1 arcs matching first + second syllable
+    if (syllables.length >= 2) {
+      svg.querySelectorAll(`[data-syl1="${syllables[0]}"][data-syl2="${syllables[1]}"][data-ring="1"]`).forEach(el => {
+        el.classList.add('sun-arc--active');
+      });
+    }
+
+    // Highlight word arcs in zoomed view matching the path
+    if (syllables.length >= 3) {
+      svg.querySelectorAll(`[data-syl1="${syllables[0]}"][data-syl2="${syllables[1]}"][data-ring="2"]`).forEach(el => {
+        if (syllables[2] && el.dataset.syl3 === syllables[2]) {
+          el.classList.add('sun-arc--active');
+        }
+      });
+    }
+  }
+
+  // Subscribe to buildingWord changes for path highlighting
+  const unsubWord = buildingWord.onChange(() => {
+    highlightPath(buildingWord.syllables);
+  });
+
+  // Also listen for syllable:play to catch external plays
+  const unsubPlay = on('syllable:play', ({ syllable }) => {
+    // Highlight is driven by buildingWord.onChange above,
+    // but if we want immediate feedback we can re-highlight
+    highlightPath(buildingWord.syllables);
+  });
+
   return {
     el: wrapper,
-    destroy() { wrapper.remove(); },
-    zoomTo(note) { zoomedNote = note; render(); },
-    zoomOut() { zoomedNote = null; render(); },
+    destroy() {
+      unsubWord();
+      unsubPlay();
+      wrapper.remove();
+    },
+    zoomTo(note) { zoomedNote = note; render(); highlightPath(buildingWord.syllables); },
+    zoomOut() { zoomedNote = null; render(); highlightPath(buildingWord.syllables); },
   };
 }

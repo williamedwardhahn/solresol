@@ -2,6 +2,7 @@ import { parseWord, getColor, getFrequency, translate, getEntry } from '../utils
 import { getAllNotations } from '../utils/notation.js';
 import { getAntonym } from '../utils/antonyms.js';
 import { getSemanticCategory, STRESS_RULES } from '../utils/grammar.js';
+import { displayWord } from '../utils/format.js';
 
 const SYLLABLE_COUNT_CLASS = {
   1: 'Particles',
@@ -37,7 +38,7 @@ export class SolresolWord {
   // --- Computed properties (all representations) ---
 
   get text() {
-    return this.syllables.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+    return displayWord(this.syllables);
   }
 
   get colors() {

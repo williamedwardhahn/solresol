@@ -105,3 +105,110 @@ export function getSemanticCategory(solresolWord) {
   if (syllables.length === 0) return null;
   return SEMANTIC_CATEGORIES[syllables[0]] || null;
 }
+
+/**
+ * Analyze a sequence of SolresolWords for grammatical structure.
+ * Assigns roles based on word order and markers.
+ */
+export function analyzeGrammar(words) {
+  const roles = assignRoles(words);
+  return {
+    roles,
+    tense: detectTense(words),
+    isValid: roles.length > 0,
+    suggestions: suggestNext(roles),
+  };
+}
+
+/** Assign grammatical roles to words based on Solresol word order */
+function assignRoles(words) {
+  // Word order: subject → directObj → adjective → tense → verb → adverb → indirectObj → question
+  const roles = [];
+  const tenseMarkerKeys = new Set(Object.values(TENSE_MARKERS).map(m => m.solresol.toLowerCase()));
+
+  let phase = 0; // tracks position in word order
+  for (const w of words) {
+    const text = w.text.toLowerCase();
+    const syls = w.syllables;
+
+    // Single-syllable particles
+    if (syls.length === 1) {
+      if (syls[0] === 'do') {
+        roles.push({ word: w, role: 'negation' });
+      } else if (syls[0] === 'sol') {
+        roles.push({ word: w, role: 'question' });
+      } else {
+        roles.push({ word: w, role: 'particle' });
+      }
+      continue;
+    }
+
+    // Tense markers (doubled syllables: dodo, rere, etc.)
+    if (tenseMarkerKeys.has(text)) {
+      roles.push({ word: w, role: 'tense-marker' });
+      phase = 4; // after tense comes verb
+      continue;
+    }
+
+    // Assign based on position and stress
+    const pos = w.partOfSpeech;
+    if (pos === 'verb' || (phase >= 4 && phase < 5)) {
+      roles.push({ word: w, role: 'verb' });
+      phase = 5;
+    } else if (pos === 'adjective') {
+      roles.push({ word: w, role: 'adjective' });
+    } else if (pos === 'adverb') {
+      roles.push({ word: w, role: 'adverb' });
+    } else if (phase < 1) {
+      roles.push({ word: w, role: 'subject' });
+      phase = 1;
+    } else if (phase < 2) {
+      roles.push({ word: w, role: 'object' });
+      phase = 2;
+    } else if (phase >= 5) {
+      roles.push({ word: w, role: 'indirect-object' });
+    } else {
+      roles.push({ word: w, role: 'noun' });
+      phase = Math.max(phase, 2);
+    }
+  }
+
+  return roles;
+}
+
+function detectTense(words) {
+  const tenseMap = {};
+  for (const [key, marker] of Object.entries(TENSE_MARKERS)) {
+    tenseMap[marker.solresol.toLowerCase()] = key;
+  }
+  for (const w of words) {
+    const t = tenseMap[w.text.toLowerCase()];
+    if (t) return t;
+  }
+  return 'present';
+}
+
+/** Suggest what grammatical roles are missing from the sentence */
+export function suggestNext(roles) {
+  const filled = new Set(roles.map(r => r.role));
+  const suggestions = [];
+  if (!filled.has('subject')) suggestions.push('subject');
+  if (!filled.has('verb')) suggestions.push('verb');
+  if (!filled.has('object') && filled.has('verb')) suggestions.push('object');
+  if (!filled.has('adjective')) suggestions.push('adjective');
+  if (!filled.has('adverb') && filled.has('verb')) suggestions.push('adverb');
+  return suggestions;
+}
+
+/**
+ * Get stress-aware audio parameters for playing a word.
+ * Stressed syllable is louder and longer.
+ */
+export function stressParams(word) {
+  const idx = word.stressIndex;
+  return word.syllables.map((syl, i) => ({
+    syllable: syl,
+    gain: i === idx ? 0.5 : 0.3,
+    duration: i === idx ? 0.55 : 0.4,
+  }));
+}

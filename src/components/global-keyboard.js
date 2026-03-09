@@ -4,16 +4,18 @@ import { SolresolWord } from '../models/word.js';
 import { createWordRenderer } from './word-renderer.js';
 import { createWordPredictor } from './word-predictor.js';
 import { playNote, playWord } from '../audio/synth.js';
-import { focusWord, commitFocusWord, setFocusWord } from '../state/focus-word.js';
+import { buildingWord, commitBuildingWord } from '../state/focus-word.js';
 import { MidiInput } from '../audio/midi.js';
 import { on, emit } from '../utils/events.js';
+import { managed } from '../utils/lifecycle.js';
+import { displaySyllable } from '../utils/format.js';
 
 let waveform = (() => { try { return localStorage.getItem('solresol:waveform') || 'sine'; } catch { return 'sine'; } })();
-let captured = null; // quiz can capture keyboard input
+/** Priority-based input handler stack. Highest priority handles input first. */
+const inputHandlers = []; // [{ id, handler, priority }]
 let keyboardEl = null;
 let buildEl = null;
-let wordRenderer = null;
-let wordPredictor = null;
+const buildScope = managed();
 let collapsed = false;
 const keyEls = {};
 
@@ -27,7 +29,7 @@ export function initGlobalKeyboard(container) {
   container.innerHTML = `
     <div class="gk-inner">
       <div class="gk-keys" id="gk-keys"></div>
-      <div class="gk-building" id="gk-building">
+      <div class="gk-building" id="gk-building" aria-live="assertive">
         <span class="gk-hint">Play notes...</span>
       </div>
       <div class="gk-actions">
@@ -59,7 +61,7 @@ export function initGlobalKeyboard(container) {
     const key = document.createElement('button');
     key.className = 'gk-key';
     key.style.backgroundColor = getColor(note);
-    key.textContent = note.charAt(0).toUpperCase() + note.slice(1);
+    key.textContent = displaySyllable(note);
     key.dataset.shortcut = `${i + 1}`;
     key.setAttribute('aria-label', `Play ${note}`);
     key.addEventListener('pointerdown', () => {
@@ -73,8 +75,8 @@ export function initGlobalKeyboard(container) {
   }
 
   // Controls
-  commitBtn.addEventListener('click', () => commitFocusWord());
-  undoBtn.addEventListener('click', () => focusWord.pop());
+  commitBtn.addEventListener('click', () => commitBuildingWord());
+  undoBtn.addEventListener('click', () => buildingWord.pop());
   waveformSelect.value = waveform;
   waveformSelect.addEventListener('change', () => {
     waveform = waveformSelect.value;
@@ -117,7 +119,7 @@ export function initGlobalKeyboard(container) {
   midi.init();
   document.addEventListener('midi:note', (e) => onNote(e.detail.syllable));
   document.addEventListener('midi:silence', () => {
-    if (!focusWord.isEmpty) commitFocusWord();
+    if (!buildingWord.isEmpty) commitBuildingWord();
   });
   document.addEventListener('midi:status', (e) => {
     const { connected, message } = e.detail;
@@ -131,9 +133,9 @@ export function initGlobalKeyboard(container) {
     // Don't capture when typing in inputs
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-    // If quiz has captured keyboard, delegate to it
-    if (captured) {
-      captured(e);
+    // Dispatch to highest-priority input handler if any
+    if (inputHandlers.length > 0) {
+      inputHandlers[0].handler(e);
       return;
     }
 
@@ -151,24 +153,24 @@ export function initGlobalKeyboard(container) {
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      commitFocusWord();
+      commitBuildingWord();
     }
     if (e.key === 'Backspace') {
       e.preventDefault();
-      focusWord.pop();
+      buildingWord.pop();
     }
     if (e.key === 'Escape') {
-      focusWord.clear();
+      buildingWord.clear();
     }
   });
 
   // React to focus word changes
-  focusWord.onChange(() => renderBuilding());
+  buildingWord.onChange(() => renderBuilding());
 
   // Listen for external focus requests (from clicking words elsewhere)
   on('word:focus', () => {
     // Expand keyboard if collapsed when a word is focused
-    if (collapsed && !focusWord.isEmpty) {
+    if (collapsed && !buildingWord.isEmpty) {
       collapsed = false;
       container.classList.remove('global-keyboard--collapsed');
       toggleBtn.textContent = '▾';
@@ -180,11 +182,11 @@ export function initGlobalKeyboard(container) {
 
 function onNote(syllable) {
   playNote(syllable, { waveform });
-  focusWord.push(syllable);
+  buildingWord.push(syllable);
   emit('syllable:play', { syllable });
 
-  if (focusWord.length >= 5) {
-    commitFocusWord();
+  if (buildingWord.length >= 5) {
+    commitBuildingWord();
   }
 }
 
@@ -198,19 +200,17 @@ function flashKey(note) {
 
 function renderBuilding() {
   buildEl.innerHTML = '';
+  buildScope.destroyAll();
 
-  if (wordRenderer) { wordRenderer.destroy(); wordRenderer = null; }
-  if (wordPredictor) { wordPredictor.destroy(); wordPredictor = null; }
-
-  if (focusWord.isEmpty) {
+  if (buildingWord.isEmpty) {
     // Show predictor in empty state (hint text)
-    wordPredictor = createWordPredictor(focusWord);
+    const wordPredictor = buildScope.track(createWordPredictor(buildingWord));
     buildEl.appendChild(wordPredictor.el);
     return;
   }
 
   // Color blocks for current word
-  wordRenderer = createWordRenderer(focusWord, {
+  const wordRenderer = buildScope.track(createWordRenderer(buildingWord, {
     size: 'sm',
     showSheet: false,
     showDefinition: false,
@@ -218,19 +218,34 @@ function renderBuilding() {
     reactive: false,
     notations: new Set(['colors']),
     clickToFocus: false,
-  });
+  }));
   buildEl.appendChild(wordRenderer.el);
 
   // Meaning landscape predictor
-  wordPredictor = createWordPredictor(focusWord);
+  const wordPredictor = buildScope.track(createWordPredictor(buildingWord));
   buildEl.appendChild(wordPredictor.el);
 }
 
-/** Quiz can capture keyboard input temporarily */
-export function captureKeyboard(handler) {
-  captured = handler;
+/** Push an input handler onto the priority stack. Higher priority = handles first. */
+export function pushInputHandler(id, handler, priority = 0) {
+  // Remove existing handler with same id
+  popInputHandler(id);
+  inputHandlers.push({ id, handler, priority });
+  inputHandlers.sort((a, b) => b.priority - a.priority);
 }
 
+/** Remove an input handler by id. */
+export function popInputHandler(id) {
+  const idx = inputHandlers.findIndex(h => h.id === id);
+  if (idx !== -1) inputHandlers.splice(idx, 1);
+}
+
+/** @deprecated Use pushInputHandler/popInputHandler instead */
+export function captureKeyboard(handler) {
+  pushInputHandler('legacy-capture', handler, 10);
+}
+
+/** @deprecated Use pushInputHandler/popInputHandler instead */
 export function releaseKeyboard() {
-  captured = null;
+  popInputHandler('legacy-capture');
 }
