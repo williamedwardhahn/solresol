@@ -57,8 +57,8 @@ button.note-block:active {
   gap: 0.15rem;
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: var(--bg);
+  border: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   text-align: left;
@@ -66,8 +66,8 @@ button.note-block:active {
   color: inherit;
 }
 .wp-branch:hover {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.15);
+  background: var(--bg-hover);
+  border-color: var(--accent);
 }
 
 .wp-branch-header { display: flex; align-items: center; gap: 0.4rem; }
@@ -80,16 +80,29 @@ button.note-block:active {
 .wp-match {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  background: rgba(0, 178, 176, 0.15);
-  border: 1px solid rgba(0, 178, 176, 0.3);
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
   color: var(--accent);
   font-size: 0.8rem;
   cursor: pointer;
   font: inherit;
 }
-.wp-match:hover { background: rgba(0, 178, 176, 0.25); }
+.wp-match:hover { background: rgba(0, 143, 140, 0.15); }
 
-.wp-dead-end { font-size: 0.8rem; color: var(--text-dim); font-style: italic; padding: 0.5rem; }
+/* Dead-end creativity */
+.wp-dead-end { font-size: 0.8rem; color: var(--text-dim); padding: 0.5rem; }
+.wp-dead-notice { font-style: italic; }
+.wp-dead-input-row { margin-top: 0.5rem; }
+.wp-dead-prompt { font-size: 0.8rem; color: var(--text-dim); display: block; margin-bottom: 0.25rem; }
+.wp-dead-input-wrap { display: flex; gap: 0.25rem; }
+.wp-dead-input { flex: 1; padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem; background: var(--bg-input); color: var(--text); }
+.wp-dead-input:focus { border-color: var(--accent); outline: none; }
+.wp-dead-save-btn { padding: 0.3rem 0.6rem; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent-light); color: var(--accent); font-size: 0.75rem; cursor: pointer; }
+.wp-dead-save-btn:hover { background: var(--accent); color: #fff; }
+.wp-dead-custom-def { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; }
+.wp-dead-custom-label { font-size: 0.8rem; color: var(--accent); }
+.wp-dead-edit-btn { padding: 0.15rem 0.4rem; border: 1px solid var(--border); border-radius: 4px; background: none; color: var(--text-dim); font-size: 0.7rem; cursor: pointer; }
+.wp-dead-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
 .wp-dead-analysis { font-size: 0.8rem; color: var(--text-dim); padding: 0.35rem 0; }
 .wp-dead-reverse { font-size: 0.8rem; color: var(--accent); margin-top: 0.25rem; }
 

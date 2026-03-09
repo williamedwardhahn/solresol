@@ -11,9 +11,7 @@ import { PHRASE_CATEGORIES } from '../utils/phrases.js';
  */
 export function renderTranslate(container) {
   container.innerHTML = `
-    <section class="view translate-view">
-      <h2>Translate</h2>
-      <div class="translator-controls">
+    <div class="translator-controls">
         <div class="translator-direction">
           <button class="btn btn--active" data-dir="en-sol">English → Solresol</button>
           <button class="btn" data-dir="sol-en">Solresol → English</button>
@@ -32,7 +30,6 @@ export function renderTranslate(container) {
         <summary><h3 style="display:inline">Common Phrases</h3></summary>
         <div id="phrase-cats"></div>
       </details>
-    </section>
   `;
 
   const input = container.querySelector('#translator-input');

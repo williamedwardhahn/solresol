@@ -21,17 +21,14 @@ const PAGE_SIZE = 50;
  */
 export function renderDictionary(container) {
   container.innerHTML = `
-    <section class="view dictionary-view">
-      <h2>Dictionary</h2>
-      <div class="dict-modes">
-        <button class="btn btn--active" data-mode="all">All Words</button>
-        <button class="btn" data-mode="sunburst">Sunburst</button>
-        <button class="btn" data-mode="category">By Category</button>
-        <button class="btn" data-mode="antonyms">Antonyms</button>
-        <button class="btn" data-mode="numbers">Numbers</button>
-      </div>
-      <div id="dict-content"></div>
-    </section>
+    <div class="dict-modes">
+      <button class="btn btn--active" data-mode="all">All Words</button>
+      <button class="btn" data-mode="sunburst">Sunburst</button>
+      <button class="btn" data-mode="category">By Category</button>
+      <button class="btn" data-mode="antonyms">Antonyms</button>
+      <button class="btn" data-mode="numbers">Numbers</button>
+    </div>
+    <div id="dict-content"></div>
   `;
 
   const contentEl = container.querySelector('#dict-content');

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Solresol — the universal musical language. Translate, learn, and play with the 7-note constructed language.">
-  <title>Solresol</title>
+  <meta name="description" content="Solresol — the universal musical language. Play, compose, and learn with the 7-note constructed language.">
+  <title>Solresol — The Musical Language</title>
   <link rel="stylesheet" href="./styles/base.css">
   <link rel="stylesheet" href="./styles/components.css">
   <link rel="stylesheet" href="./styles/views.css">
@@ -13,22 +13,83 @@
 <body>
   <header class="header">
     <div class="header-inner">
-      <a href="#play" class="logo">
+      <a href="#" class="logo">
         <span class="logo-notes">
           <span style="color:#c40233">Do</span><span style="color:#e16b1a">Re</span><span style="color:#eac100">Mi</span><span style="color:#00a368">Fa</span><span style="color:#00b2b0">Sol</span><span style="color:#0088bf">La</span><span style="color:#624579">Si</span>
         </span>
         <span class="logo-title">Solresol</span>
+        <span class="logo-sub">The Musical Language</span>
       </a>
-      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
-      <nav class="nav" id="app-nav" role="navigation" aria-label="Main navigation"></nav>
+      <nav class="nav" id="app-nav">
+        <a href="#keyboard" class="nav-link">Play</a>
+        <a href="#dictionary-section" class="nav-link">Dictionary</a>
+        <a href="#translate-section" class="nav-link">Translate</a>
+        <a href="#learn-section" class="nav-link">Learn</a>
+      </nav>
     </div>
   </header>
-  <div id="global-keyboard" class="global-keyboard"></div>
-  <div class="app-body">
-    <main id="app-content" class="content"></main>
-    <aside id="context-panel" class="context-panel" aria-label="Word details"></aside>
-  </div>
-  <div id="sentence-bar" class="sentence-bar sentence-bar--empty" aria-label="Current sentence"></div>
+
+  <main class="page">
+    <!-- HERO: The Keyboard -->
+    <section id="keyboard" class="section section--hero">
+      <div id="hero-keyboard" class="hero-keyboard"></div>
+    </section>
+
+    <!-- Building Word + Predictor -->
+    <section id="building-section" class="section">
+      <div id="building-area" class="building-area"></div>
+    </section>
+
+    <!-- Sentence -->
+    <section id="sentence-section" class="section">
+      <div id="sentence-display" class="sentence-display"></div>
+    </section>
+
+    <!-- Dictionary + Learn side by side -->
+    <section class="section section--panels">
+      <div class="panel-grid">
+        <div id="dictionary-section" class="panel">
+          <button class="panel-header" data-panel="dict">
+            <h2>Dictionary</h2>
+            <span class="panel-toggle">▾</span>
+          </button>
+          <div class="panel-body" id="dict-panel-body"></div>
+        </div>
+        <div id="learn-section" class="panel">
+          <button class="panel-header" data-panel="learn">
+            <h2>Learn</h2>
+            <span class="panel-toggle">▾</span>
+          </button>
+          <div class="panel-body" id="learn-panel-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Translate -->
+    <section id="translate-section" class="section">
+      <div class="panel">
+        <button class="panel-header" data-panel="translate">
+          <h2>Translate</h2>
+          <span class="panel-toggle">▾</span>
+        </button>
+        <div class="panel-body" id="translate-panel-body"></div>
+      </div>
+    </section>
+
+    <!-- Sequencer (collapsible) -->
+    <section class="section">
+      <div class="panel">
+        <button class="panel-header" data-panel="sequencer">
+          <h2>Sequencer</h2>
+          <span class="panel-toggle">▸</span>
+        </button>
+        <div class="panel-body panel-body--collapsed" id="sequencer-panel-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <aside id="context-panel" class="context-panel" aria-label="Word details"></aside>
+
   <script type="module">
     import { initApp } from './src/app.js';
     initApp();

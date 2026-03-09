@@ -13,108 +13,86 @@ import { displaySyllable } from '../utils/format.js';
 let waveform = (() => { try { return localStorage.getItem('solresol:waveform') || 'sine'; } catch { return 'sine'; } })();
 /** Priority-based input handler stack. Highest priority handles input first. */
 const inputHandlers = []; // [{ id, handler, priority }]
-let keyboardEl = null;
-let buildEl = null;
+let keyboardContainer = null;
+let buildContainer = null;
 const buildScope = managed();
-let collapsed = false;
 const keyEls = {};
 
 const KEY_MAP = ['q', 'w', 'e', 'r', 't', 'y', 'u'];
 
 /**
- * Initialize the global keyboard bar.
- * Persists across all navigation — never destroyed.
+ * Initialize the hero keyboard section + building area.
+ * @param {HTMLElement} heroEl — container for the keyboard keys (#hero-keyboard)
+ * @param {HTMLElement} buildEl — container for building word + predictor (#building-area)
  */
-export function initGlobalKeyboard(container) {
-  container.innerHTML = `
-    <div class="gk-inner">
-      <div class="gk-keys" id="gk-keys"></div>
-      <div class="gk-building" id="gk-building" aria-live="assertive">
-        <span class="gk-hint">Play notes...</span>
-      </div>
-      <div class="gk-actions">
-        <button class="btn btn--sm" id="gk-commit" title="Commit word (Enter)">Commit</button>
-        <button class="btn btn--sm" id="gk-undo" title="Undo last note (Backspace)">⌫</button>
-        <select id="gk-waveform" class="select gk-waveform" title="Waveform">
-          <option value="sine">♪</option>
-          <option value="triangle">△</option>
-          <option value="sawtooth">⊿</option>
-          <option value="square">□</option>
-        </select>
-        <span class="gk-midi-status" id="gk-midi-status" title="MIDI status"></span>
-        <button class="btn btn--sm gk-help" id="gk-help" title="Keyboard shortcuts">?</button>
-        <button class="btn btn--sm gk-toggle" id="gk-toggle" title="Toggle keyboard">▾</button>
-      </div>
-    </div>
-  `;
+export function initHeroKeyboard(heroEl, buildEl) {
+  keyboardContainer = heroEl;
+  buildContainer = buildEl;
 
-  keyboardEl = container.querySelector('#gk-keys');
-  buildEl = container.querySelector('#gk-building');
-  const commitBtn = container.querySelector('#gk-commit');
-  const undoBtn = container.querySelector('#gk-undo');
-  const waveformSelect = container.querySelector('#gk-waveform');
-  const toggleBtn = container.querySelector('#gk-toggle');
+  // Build hero keys
+  const keysRow = document.createElement('div');
+  keysRow.className = 'hero-keys';
 
-  // Build keys
   for (let i = 0; i < NOTES.length; i++) {
     const note = NOTES[i];
     const key = document.createElement('button');
-    key.className = 'gk-key';
+    key.className = 'hero-key';
     key.style.backgroundColor = getColor(note);
-    key.textContent = displaySyllable(note);
-    key.dataset.shortcut = `${i + 1}`;
     key.setAttribute('aria-label', `Play ${note}`);
+    key.innerHTML = `
+      <span class="hero-key-name">${displaySyllable(note)}</span>
+      <span class="hero-key-num">${i + 1}</span>
+      <span class="hero-key-shortcut">${KEY_MAP[i].toUpperCase()}</span>
+    `;
     key.addEventListener('pointerdown', () => {
-      key.classList.add('gk-key--active');
+      key.classList.add('hero-key--active');
       onNote(note);
     });
-    key.addEventListener('pointerup', () => key.classList.remove('gk-key--active'));
-    key.addEventListener('pointerleave', () => key.classList.remove('gk-key--active'));
-    keyboardEl.appendChild(key);
+    key.addEventListener('pointerup', () => key.classList.remove('hero-key--active'));
+    key.addEventListener('pointerleave', () => key.classList.remove('hero-key--active'));
+    keysRow.appendChild(key);
     keyEls[note] = key;
   }
 
-  // Controls
+  heroEl.appendChild(keysRow);
+
+  // Hero actions row (commit, undo, waveform)
+  const actionsRow = document.createElement('div');
+  actionsRow.className = 'hero-actions';
+
+  const commitBtn = document.createElement('button');
+  commitBtn.className = 'btn';
+  commitBtn.textContent = 'Commit (Enter)';
   commitBtn.addEventListener('click', () => commitBuildingWord());
+
+  const undoBtn = document.createElement('button');
+  undoBtn.className = 'btn btn--sm';
+  undoBtn.textContent = '⌫ Undo';
   undoBtn.addEventListener('click', () => buildingWord.pop());
+
+  const waveformSelect = document.createElement('select');
+  waveformSelect.className = 'select';
+  waveformSelect.title = 'Waveform';
+  waveformSelect.innerHTML = `
+    <option value="sine">♪ Sine</option>
+    <option value="triangle">△ Triangle</option>
+    <option value="sawtooth">⊿ Sawtooth</option>
+    <option value="square">□ Square</option>
+  `;
   waveformSelect.value = waveform;
   waveformSelect.addEventListener('change', () => {
     waveform = waveformSelect.value;
     try { localStorage.setItem('solresol:waveform', waveform); } catch {}
   });
-  toggleBtn.addEventListener('click', () => {
-    collapsed = !collapsed;
-    container.classList.toggle('global-keyboard--collapsed', collapsed);
-    toggleBtn.textContent = collapsed ? '▸' : '▾';
-  });
 
-  // Help overlay
-  const helpBtn = container.querySelector('#gk-help');
-  helpBtn.addEventListener('click', () => {
-    const existing = document.querySelector('.gk-help-overlay');
-    if (existing) { existing.remove(); return; }
-    const overlay = document.createElement('div');
-    overlay.className = 'gk-help-overlay';
-    overlay.innerHTML = `
-      <div class="gk-help-card">
-        <h3>Keyboard Shortcuts</h3>
-        <table>
-          <tr><td><kbd>1</kbd>–<kbd>7</kbd></td><td>Play notes Do–Si</td></tr>
-          <tr><td><kbd>Q W E R T Y U</kbd></td><td>Play notes (alternate)</td></tr>
-          <tr><td><kbd>Enter</kbd></td><td>Commit word</td></tr>
-          <tr><td><kbd>Backspace</kbd></td><td>Undo last note</td></tr>
-          <tr><td><kbd>Escape</kbd></td><td>Clear / close panel</td></tr>
-        </table>
-        <button class="btn btn--sm" id="gk-help-close">Got it</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    overlay.querySelector('#gk-help-close').addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  });
+  const midiStatusEl = document.createElement('span');
+  midiStatusEl.className = 'hero-midi-status';
+  midiStatusEl.id = 'hero-midi-status';
+
+  actionsRow.append(commitBtn, undoBtn, waveformSelect, midiStatusEl);
+  heroEl.appendChild(actionsRow);
 
   // MIDI
-  const midiStatusEl = container.querySelector('#gk-midi-status');
   const midi = new MidiInput();
   midi.init();
   document.addEventListener('midi:note', (e) => onNote(e.detail.syllable));
@@ -125,12 +103,10 @@ export function initGlobalKeyboard(container) {
     const { connected, message } = e.detail;
     midiStatusEl.textContent = connected ? '🎹' : '';
     midiStatusEl.title = message;
-    midiStatusEl.classList.toggle('gk-midi--connected', connected);
   });
 
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {
-    // Don't capture when typing in inputs
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
     // Dispatch to highest-priority input handler if any
@@ -164,18 +140,8 @@ export function initGlobalKeyboard(container) {
     }
   });
 
-  // React to focus word changes
+  // React to building word changes
   buildingWord.onChange(() => renderBuilding());
-
-  // Listen for external focus requests (from clicking words elsewhere)
-  on('word:focus', () => {
-    // Expand keyboard if collapsed when a word is focused
-    if (collapsed && !buildingWord.isEmpty) {
-      collapsed = false;
-      container.classList.remove('global-keyboard--collapsed');
-      toggleBtn.textContent = '▾';
-    }
-  });
 
   renderBuilding();
 }
@@ -193,42 +159,58 @@ function onNote(syllable) {
 function flashKey(note) {
   const el = keyEls[note];
   if (el) {
-    el.classList.add('gk-key--active');
-    setTimeout(() => el.classList.remove('gk-key--active'), 120);
+    el.classList.add('hero-key--active');
+    setTimeout(() => el.classList.remove('hero-key--active'), 120);
   }
 }
 
 function renderBuilding() {
-  buildEl.innerHTML = '';
+  if (!buildContainer) return;
+  buildContainer.innerHTML = '';
   buildScope.destroyAll();
 
   if (buildingWord.isEmpty) {
-    // Show predictor in empty state (hint text)
-    const wordPredictor = buildScope.track(createWordPredictor(buildingWord));
-    buildEl.appendChild(wordPredictor.el);
+    // Show empty state with predictor hint
+    const buildingWord_ = document.createElement('div');
+    buildingWord_.className = 'building-word';
+    const empty = document.createElement('div');
+    empty.className = 'building-empty';
+    empty.textContent = 'Play notes to build words...';
+    buildingWord_.appendChild(empty);
+
+    const predictor = buildScope.track(createWordPredictor(buildingWord));
+    buildingWord_.appendChild(predictor.el);
+    buildContainer.appendChild(buildingWord_);
     return;
   }
 
+  const wrapper = document.createElement('div');
+  wrapper.className = 'building-word';
+
   // Color blocks for current word
   const wordRenderer = buildScope.track(createWordRenderer(buildingWord, {
-    size: 'sm',
+    size: 'md',
     showSheet: false,
-    showDefinition: false,
-    showMirror: false,
+    showDefinition: true,
+    showMirror: true,
     reactive: false,
-    notations: new Set(['colors']),
+    notations: new Set(['colors', 'solfege']),
     clickToFocus: false,
   }));
-  buildEl.appendChild(wordRenderer.el);
+  wrapper.appendChild(wordRenderer.el);
 
   // Meaning landscape predictor
-  const wordPredictor = buildScope.track(createWordPredictor(buildingWord));
-  buildEl.appendChild(wordPredictor.el);
+  const predictor = buildScope.track(createWordPredictor(buildingWord));
+  const predictorWrap = document.createElement('div');
+  predictorWrap.className = 'building-predictor';
+  predictorWrap.appendChild(predictor.el);
+  wrapper.appendChild(predictorWrap);
+
+  buildContainer.appendChild(wrapper);
 }
 
 /** Push an input handler onto the priority stack. Higher priority = handles first. */
 export function pushInputHandler(id, handler, priority = 0) {
-  // Remove existing handler with same id
   popInputHandler(id);
   inputHandlers.push({ id, handler, priority });
   inputHandlers.sort((a, b) => b.priority - a.priority);
@@ -249,3 +231,6 @@ export function captureKeyboard(handler) {
 export function releaseKeyboard() {
   popInputHandler('legacy-capture');
 }
+
+// Keep old export name for backward compat
+export const initGlobalKeyboard = initHeroKeyboard;

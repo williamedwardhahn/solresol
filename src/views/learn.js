@@ -27,16 +27,12 @@ function shuffle(arr) {
  */
 export function renderLearn(container) {
   container.innerHTML = `
-    <section class="view learn-view">
-      <h2>Learn</h2>
-      <div class="learn-modes">
-        <button class="btn btn--active" data-mode="study">Study</button>
-        <button class="btn" data-mode="quiz">Quiz</button>
-      </div>
-
-      <div id="learn-study" class="learn-section"></div>
-      <div id="learn-quiz" class="learn-section" style="display:none"></div>
-    </section>
+    <div class="learn-modes">
+      <button class="btn btn--active" data-mode="study">Study</button>
+      <button class="btn" data-mode="quiz">Quiz</button>
+    </div>
+    <div id="learn-study" class="learn-section"></div>
+    <div id="learn-quiz" class="learn-section" style="display:none"></div>
   `;
 
   const studySection = container.querySelector('#learn-study');
