@@ -27,6 +27,13 @@ export function setFocusWord(input) {
   emit('word:focus', { word: focusWord });
 }
 
+export function undoLastWord() {
+  if (committedWords.length === 0) return null;
+  const removed = committedWords.pop();
+  emit('word:undo', { word: removed });
+  return removed;
+}
+
 export function clearSentence() {
   committedWords.length = 0;
   emit('sentence:clear', {});

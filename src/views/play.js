@@ -3,10 +3,11 @@ import { createWordRenderer } from '../components/word-renderer.js';
 import { createWordBlocks } from '../components/color-block.js';
 import { createSheetMusic } from '../components/sheet-music.js';
 import { playSentence } from '../audio/synth.js';
-import { focusWord, committedWords, commitFocusWord, clearSentence } from '../state/focus-word.js';
+import { focusWord, committedWords, commitFocusWord, clearSentence, undoLastWord } from '../state/focus-word.js';
 import { buildSentence, TENSE_MARKERS } from '../utils/grammar.js';
 import { searchDictionary, parseWord, translate } from '../utils/solresol.js';
 import { on } from '../utils/events.js';
+import { createSequencer } from '../components/sequencer.js';
 
 /**
  * Play view — the home page.
@@ -24,12 +25,15 @@ export function renderPlay(container) {
       <div class="play-modes">
         <button class="btn btn--active" data-mode="free">Free Play</button>
         <button class="btn" data-mode="compose">Compose Sentence</button>
+        <button class="btn" data-mode="sequencer">Sequencer</button>
       </div>
 
       <div id="play-free" class="play-section">
         <div id="play-sentence" class="play-sentence"></div>
         <div id="play-actions" class="play-actions"></div>
       </div>
+
+      <div id="play-sequencer" class="play-section" style="display:none"></div>
 
       <div id="play-compose" class="play-section" style="display:none">
         <div class="composer-slots" id="composer-slots"></div>
@@ -64,8 +68,10 @@ export function renderPlay(container) {
   const actionsEl = container.querySelector('#play-actions');
   const freeSection = container.querySelector('#play-free');
   const composeSection = container.querySelector('#play-compose');
+  const seqSection = container.querySelector('#play-sequencer');
   const modeBtns = container.querySelectorAll('[data-mode]');
   let mode = 'free';
+  let sequencer = null;
 
   // Mode toggle
   modeBtns.forEach(btn => {
@@ -75,6 +81,10 @@ export function renderPlay(container) {
       btn.classList.add('btn--active');
       freeSection.style.display = mode === 'free' ? '' : 'none';
       composeSection.style.display = mode === 'compose' ? '' : 'none';
+      seqSection.style.display = mode === 'sequencer' ? '' : 'none';
+      if (mode === 'sequencer' && !sequencer) {
+        sequencer = createSequencer(seqSection);
+      }
     });
   });
 
@@ -84,7 +94,11 @@ export function renderPlay(container) {
     actionsEl.innerHTML = '';
 
     if (committedWords.length === 0) {
-      sentenceEl.innerHTML = '<div class="play-empty">Play notes above to build words. Committed words appear here.</div>';
+      sentenceEl.innerHTML = `<div class="play-empty">
+        <p>Use the keyboard above to play notes and build words.</p>
+        <p class="play-empty-keys"><kbd>1</kbd>–<kbd>7</kbd> play notes &nbsp; <kbd>Enter</kbd> commits &nbsp; <kbd>Backspace</kbd> undoes</p>
+        <p style="margin-top:0.5rem;font-size:0.8rem">Try pressing <kbd>1</kbd> <kbd>3</kbd> <kbd>5</kbd> then <kbd>Enter</kbd></p>
+      </div>`;
       return;
     }
 
@@ -126,20 +140,38 @@ export function renderPlay(container) {
       playSentence(committedWords.map(w => w.syllables));
     });
 
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'btn btn--sm';
+    undoBtn.textContent = 'Undo Last';
+    undoBtn.addEventListener('click', () => {
+      undoLastWord();
+      renderSentence();
+    });
+
     const clearBtn = document.createElement('button');
     clearBtn.className = 'btn btn--sm';
-    clearBtn.textContent = 'Clear';
+    clearBtn.textContent = 'Clear All';
     clearBtn.addEventListener('click', () => {
       clearSentence();
       renderSentence();
     });
 
-    actionsEl.append(playAllBtn, clearBtn);
+    actionsEl.append(playAllBtn, undoBtn, clearBtn);
   }
 
   // Listen for committed words from global keyboard
-  const unsubCommit = on('word:commit', () => renderSentence());
+  const unsubCommit = on('word:commit', ({ word }) => {
+    renderSentence();
+    // Flash animation on commit
+    sentenceEl.classList.add('play-sentence--flash');
+    setTimeout(() => sentenceEl.classList.remove('play-sentence--flash'), 400);
+    // Auto-add to sequencer if recording
+    if (sequencer && sequencer.isRecording() && word) {
+      sequencer.addWord(word.syllables);
+    }
+  });
   const unsubClear = on('sentence:clear', () => renderSentence());
+  const unsubUndo = on('word:undo', () => renderSentence());
   renderSentence();
 
   // === COMPOSE MODE ===
@@ -313,5 +345,7 @@ export function renderPlay(container) {
   return () => {
     unsubCommit();
     unsubClear();
+    unsubUndo();
+    if (sequencer) sequencer.destroy();
   };
 }

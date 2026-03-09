@@ -2,10 +2,11 @@ import { SolresolWord } from '../models/word.js';
 import { createWordRenderer } from './word-renderer.js';
 import { createNotationToggles } from './notation-display.js';
 import { getAntonym } from '../utils/antonyms.js';
-import { getSemanticCategory, SEMANTIC_CATEGORIES } from '../utils/grammar.js';
+import { SEMANTIC_CATEGORIES } from '../utils/grammar.js';
 import { translate } from '../utils/solresol.js';
 import { setFocusWord } from '../state/focus-word.js';
 import { on } from '../utils/events.js';
+import { shareWordCard } from './word-card-export.js';
 
 let panelEl = null;
 let currentRenderer = null;
@@ -69,6 +70,16 @@ export function initContextPanel(container) {
       closePanel();
     }
   });
+
+  // Swipe right to close on touch
+  let touchStartX = 0;
+  container.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  container.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (dx > 80) closePanel(); // swipe right to close
+  }, { passive: true });
 }
 
 function showWord(word) {
@@ -136,6 +147,21 @@ function showWord(word) {
     closePanel();
   });
   actions.appendChild(dictBtn);
+
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'btn btn--sm';
+  shareBtn.textContent = 'Share Card';
+  shareBtn.addEventListener('click', async () => {
+    shareBtn.disabled = true;
+    shareBtn.textContent = 'Generating...';
+    const result = await shareWordCard(displayWord);
+    shareBtn.textContent = result === 'copied' ? 'Copied!' : 'Downloaded!';
+    setTimeout(() => {
+      shareBtn.textContent = 'Share Card';
+      shareBtn.disabled = false;
+    }, 2000);
+  });
+  actions.appendChild(shareBtn);
 
   content.appendChild(actions);
 

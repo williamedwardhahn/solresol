@@ -9,6 +9,7 @@ import { numberToSolresol, getNumberTable } from '../utils/numbers.js';
 import { playWord } from '../audio/synth.js';
 import { setFocusWord } from '../state/focus-word.js';
 import { getHashParams } from '../app.js';
+import { createSunburst } from '../components/sunburst.js';
 
 const PAGE_SIZE = 50;
 
@@ -22,6 +23,7 @@ export function renderDictionary(container) {
       <h2>Dictionary</h2>
       <div class="dict-modes">
         <button class="btn btn--active" data-mode="all">All Words</button>
+        <button class="btn" data-mode="sunburst">Sunburst</button>
         <button class="btn" data-mode="category">By Category</button>
         <button class="btn" data-mode="antonyms">Antonyms</button>
         <button class="btn" data-mode="numbers">Numbers</button>
@@ -55,9 +57,13 @@ export function renderDictionary(container) {
     }
   });
 
+  let sunburstInstance = null;
+
   function renderMode() {
+    if (sunburstInstance) { sunburstInstance.destroy(); sunburstInstance = null; }
     contentEl.innerHTML = '';
     if (mode === 'all') renderAllWords(contentEl);
+    else if (mode === 'sunburst') renderSunburstMode(contentEl);
     else if (mode === 'category') renderByCategory(contentEl);
     else if (mode === 'antonyms') renderAntonyms(contentEl);
     else if (mode === 'numbers') renderNumbers(contentEl);
@@ -386,4 +392,19 @@ export function renderDictionary(container) {
       tableEl.appendChild(row);
     }
   }
+
+  // === SUNBURST MODE ===
+  function renderSunburstMode(el) {
+    el.innerHTML = `
+      <p class="view-desc">Visual map of all 3,152 Solresol words. Click a sector to zoom in, click the center to zoom out.</p>
+      <div id="sunburst-container" class="sunburst-container"></div>
+    `;
+    const sunburstEl = el.querySelector('#sunburst-container');
+    sunburstInstance = createSunburst(sunburstEl);
+  }
+
+  // Cleanup debounce timers on navigation
+  return () => {
+    if (sunburstInstance) { sunburstInstance.destroy(); sunburstInstance = null; }
+  };
 }

@@ -269,8 +269,9 @@ export function renderLearn(container) {
     const streakEl = el.querySelector('#quiz-streak');
     const qmodeBtns = el.querySelectorAll('[data-qmode]');
     let qmode = 'note';
-    let score = 0;
+    let score = (() => { try { return parseInt(localStorage.getItem('solresol:quiz-score')) || 0; } catch { return 0; } })();
     let streak = 0;
+    scoreEl.textContent = score;
     let roundCleanup = null;
     let roundTimer = null;
     let currentKeyHandler = null;
@@ -289,6 +290,7 @@ export function renderLearn(container) {
       else { streak = 0; }
       scoreEl.textContent = score;
       streakEl.textContent = streak;
+      try { localStorage.setItem('solresol:quiz-score', score); } catch {}
     }
 
     function pickRandom(arr) {

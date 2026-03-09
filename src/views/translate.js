@@ -213,4 +213,8 @@ export function renderTranslate(container) {
     }
     catsEl.appendChild(section);
   }
+
+  return () => {
+    clearTimeout(debounce);
+  };
 }
